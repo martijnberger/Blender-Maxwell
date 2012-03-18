@@ -4,12 +4,10 @@ import time
 import bpy
 import mathutils
 
-sys.path.append('/opt/maxwell/python/pymaxwell/python3.2/')
-
 from bpy_extras.io_utils import unpack_list, unpack_face_list
 from bpy_extras.image_utils import load_image
 
-from pymaxwell import *;
+from pymaxwell import pymaxwell;
 
 def load(operator, context, filepath):
 
