@@ -7,12 +7,11 @@ import mathutils
 from bpy_extras.io_utils import unpack_list, unpack_face_list
 from bpy_extras.image_utils import load_image
 
-from pymaxwell import pymaxwell;
+from . import pymaxwell;
 
 def load(operator, context, filepath):
 
     print('\nimporting mxs %r' % filepath)
-
     filepath = os.fsencode(filepath)
 
     time_main = time.time()
@@ -25,6 +24,12 @@ def load(operator, context, filepath):
     
     time_new = time.time()
     print('\nDone parsing mxs %r in %.4f sec.' % (filepath, (time_new - time_main)))
+
+    it = CmaxwellObjectIterator()
+    obj = it.first(mxs_scene)
+    while obj.isNull == False:
+        print(obj.getName())
+        obj = it.next()
 
     time_new = time.time()
     print('finished importing: %r in %.4f sec.' % (filepath, (time_new - time_main)))
