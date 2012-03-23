@@ -38,7 +38,11 @@ def load(operator, context, filepath):
     while obj.isNull() == False:
         if(obj.isMesh() == 1):
             if(obj.getNumTriangles() > 0 or obj.getNumVertexes() > 0):
-                name = obj.getName()
+                try:
+                    name = obj.getName()
+                except UnicodeDecodeError:
+                    obj.setName('corrupt' + str(n))
+                    name = 'corrupt' + str(n)
                 (base,pivot) = obj.getBaseAndPivot()
                 triangles = obj.getNumTriangles()
                 vertices = obj.getNumVertexes()
@@ -71,12 +75,13 @@ def load(operator, context, filepath):
                 me.from_pydata(verts,[],faces)   # edges or faces should be [], or you ask for problems
                 me.update(calc_edges=True)    # Update mesh with new data
                 ob = bpy.data.objects.new(name, me)
-                ob.matrix_basis = Matrix([(pivot.xAxis.x(), pivot.xAxis.z(), pivot.xAxis.y(), 0.0), 
-                                          (pivot.zAxis.x(), pivot.zAxis.z(), pivot.zAxis.y(), 0.0),
-                                          (pivot.yAxis.x(), pivot.yAxis.z(), pivot.yAxis.y(), 0.0),
-                                          (base.origin.x(), base.origin.z(), base.origin.y(), 1.0)])
-                ob.scale = [pivot.xAxis.x(), pivot.zAxis.z(), pivot.yAxis.y()]
-                ob.location = [ base.origin.x(), base.origin.z(), base.origin.y()]
+                ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(), pivot.yAxis.x(), base.origin.x()),
+                              (pivot.xAxis.z(), pivot.zAxis.z(), pivot.yAxis.z(), base.origin.z()),
+                              (pivot.xAxis.y(), pivot.zAxis.y(), pivot.yAxis.y(), base.origin.y()),
+                              (0.0, 0.0, 0.0, 1.0)]))
+
+#                ob.scale = [pivot.xAxis.x(), pivot.zAxis.z(), pivot.yAxis.y()]
+#                ob.location = [ base.origin.x(), base.origin.z(), base.origin.y()]
 
                 ob_dict[name] = ob
                 bpy.context.scene.objects.link(ob)
@@ -86,6 +91,7 @@ def load(operator, context, filepath):
                 imp=True
             else:
                 print('NOT DONE:', obj.getName(), ' NULL: ', obj.isNull() )
+                print('  ', obj.getNumVertexes(), '  ', obj.getNumTriangles())
         obj = it.next()
         #if imp:
         #    break
@@ -102,13 +108,14 @@ def load(operator, context, filepath):
             o = obj.getInstanced()
             parent_name = o.getName()
             ob = ob_dict[parent_name].copy()
-            #ob.matrix_basis = 
-            print(Matrix([(pivot.xAxis.x(), pivot.xAxis.z(), pivot.xAxis.y(), 0.0), 
-                                      (pivot.zAxis.x(), pivot.zAxis.z(), pivot.zAxis.y(), 0.0),
-                                      (pivot.yAxis.x(), pivot.yAxis.z(), pivot.yAxis.y(), 0.0),
-                                      (base.origin.x(), base.origin.z(), base.origin.y(), 1.0)]))
-            ob.scale = [pivot.xAxis.x(), pivot.zAxis.z(), pivot.yAxis.y()]
-            ob.location = [ base.origin.x(), base.origin.z(), base.origin.y()]
+            ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(), pivot.yAxis.x(), base.origin.x()),
+                          (pivot.xAxis.z(), pivot.zAxis.z(), pivot.yAxis.z(), base.origin.z()),
+                          (pivot.xAxis.y(), pivot.zAxis.y(), pivot.yAxis.y(), base.origin.y()),
+                          (0.0, 0.0, 0.0, 1.0)]))
+
+
+ #           ob.scale = [pivot.xAxis.x(), pivot.zAxis.z(), pivot.yAxis.y()]
+ #           ob.location = [ base.origin.x(), base.origin.z(), base.origin.y()]
             bpy.context.scene.objects.link(ob) 
             n = n + 1
 
