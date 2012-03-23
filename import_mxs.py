@@ -4,6 +4,7 @@ import time
 import bpy
 import mathutils
 
+from mathutils import Matrix
 from bpy_extras.io_utils import unpack_list, unpack_face_list
 from bpy_extras.image_utils import load_image
 
@@ -25,6 +26,7 @@ def load(operator, context, filepath):
         print(mxs_scene.getLastErrorString())
    
     time_new = time.time()
+    time_old = time.time()
     print('\nDone parsing mxs %r in %.4f sec.' % (filepath, (time_new - time_main)))
 
     it = CmaxwellObjectIterator()
@@ -32,10 +34,11 @@ def load(operator, context, filepath):
     print(type(obj))
     n = 1
     imp=False
+    ob_dict = {}
     while obj.isNull() == False:
         if(obj.isMesh() == 1):
-            if(obj.getNumTriangles() > 0):
-                #print("Mesh", obj.getName())
+            if(obj.getNumTriangles() > 0 or obj.getNumVertexes() > 0):
+                name = obj.getName()
                 (base,pivot) = obj.getBaseAndPivot()
                 triangles = obj.getNumTriangles()
                 vertices = obj.getNumVertexes()
@@ -50,9 +53,9 @@ def load(operator, context, filepath):
                     triangle = obj.getTriangle(i)
                     (v1,v2,v3,n1,n2,n3) = triangle
                     my_max = max(my_max,v1,v2,v3)
-                    faces.append((v1,v2,v3,v1))
+                    faces.append((v1,v2,v3))
                     i = i + 1
-                print("Triangles: ", triangles , "\tVertices:", my_max ,"\tNormals:", normals, "\tPositions:", positions)
+                #print("Triangles: ", triangles , "\tVertices:", my_max ,"\tNormals:", normals, "\tPositions:", positions)
                 i = 0
                 while i <= my_max:
                     vert = obj.getVertex(i,0)
@@ -64,31 +67,57 @@ def load(operator, context, filepath):
                        # Define the faces by index numbers. Each faces is defined by 4 consecutive integers.
                        # For triangles you need to repeat the first vertex also in the fourth position.
                 #faces=[ (2,1,0,3), (0,1,4,0), (1,2,4,1), (2,3,4,2), (3,0,4,3)]
-                me = bpy.data.meshes.new('Mesh')
+                me = bpy.data.meshes.new(str(n) + name)
                 me.from_pydata(verts,[],faces)   # edges or faces should be [], or you ask for problems
                 me.update(calc_edges=True)    # Update mesh with new data
-                ob = bpy.data.objects.new(str(n), me)
-                ob.location = (0.0, 0.0, 0.0)
-                ob.show_name = True
+                ob = bpy.data.objects.new(name, me)
+                ob.matrix_basis = Matrix([(pivot.xAxis.x(), pivot.xAxis.z(), pivot.xAxis.y(), 0.0), 
+                                          (pivot.zAxis.x(), pivot.zAxis.z(), pivot.zAxis.y(), 0.0),
+                                          (pivot.yAxis.x(), pivot.yAxis.z(), pivot.yAxis.y(), 0.0),
+                                          (base.origin.x(), base.origin.z(), base.origin.y(), 1.0)])
                 ob.scale = [pivot.xAxis.x(), pivot.zAxis.z(), pivot.yAxis.y()]
                 ob.location = [ base.origin.x(), base.origin.z(), base.origin.y()]
-                #ob.matrix_world = [pivot.xAxis.x(), pivot.xAxis.z(), pivot.xAxis.y(), 0.0, 
-                #                    pivot.zAxis.x(), pivot.zAxis.z(), pivot.zAxis.y(), 0.0,
-                #                    pivot.yAxis.x(), pivot.yAxis.z(), pivot.yAxis.y(), 0.0,
-                #                    base.origin.x(), base.origin.z(), base.origin.y(), 1.0]
 
+                ob_dict[name] = ob
                 bpy.context.scene.objects.link(ob)
                 
                 me.update(calc_edges=True)
-                print(base, pivot)
                 n = n + 1
                 imp=True
-
+            else:
+                print('NOT DONE:', obj.getName(), ' NULL: ', obj.isNull() )
         obj = it.next()
         #if imp:
         #    break
-
     time_new = time.time()
+    print('imported %d objects in %.4f sec' % (n, (time_new - time_old)))
+    time_old = time.time()
+
+    it = CmaxwellObjectIterator()
+    obj = it.first(mxs_scene)
+    n = 1
+    while obj.isNull() == False:
+        if(obj.isInstance() == 1):
+            (base,pivot) = obj.getBaseAndPivot()
+            o = obj.getInstanced()
+            parent_name = o.getName()
+            ob = ob_dict[parent_name].copy()
+            #ob.matrix_basis = 
+            print(Matrix([(pivot.xAxis.x(), pivot.xAxis.z(), pivot.xAxis.y(), 0.0), 
+                                      (pivot.zAxis.x(), pivot.zAxis.z(), pivot.zAxis.y(), 0.0),
+                                      (pivot.yAxis.x(), pivot.yAxis.z(), pivot.yAxis.y(), 0.0),
+                                      (base.origin.x(), base.origin.z(), base.origin.y(), 1.0)]))
+            ob.scale = [pivot.xAxis.x(), pivot.zAxis.z(), pivot.yAxis.y()]
+            ob.location = [ base.origin.x(), base.origin.z(), base.origin.y()]
+            bpy.context.scene.objects.link(ob) 
+            n = n + 1
+
+        obj = it.next()
+    time_new = time.time()
+    print('imported %d instance in %.4f sec' % (n, (time_new - time_old)))
+
+    print(mxs_scene.getSceneInfo())
+    
     print('finished importing: %r in %.4f sec.' % (filepath, (time_new - time_main)))
     return {'FINISHED'}
 
