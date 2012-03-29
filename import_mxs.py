@@ -76,8 +76,8 @@ def load(operator, context, filepath):
                 me.update(calc_edges=True)    # Update mesh with new data
                 ob = bpy.data.objects.new(name, me)
                 ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(), pivot.yAxis.x(), base.origin.x()),
-                              (pivot.xAxis.z(), pivot.zAxis.z(), pivot.yAxis.z(), base.origin.z()),
-                              (pivot.xAxis.y(), pivot.zAxis.y(), pivot.yAxis.y(), base.origin.y()),
+                              (-1 *pivot.xAxis.z(), -1 * pivot.zAxis.z(), -1 * pivot.yAxis.z(), -1 * base.origin.z()),
+                              (pivot.xAxis.y(),  pivot.zAxis.y(), pivot.yAxis.y(), base.origin.y()),
                               (0.0, 0.0, 0.0, 1.0)]))
 
 #                ob.scale = [pivot.xAxis.x(), pivot.zAxis.z(), pivot.yAxis.y()]
@@ -109,7 +109,7 @@ def load(operator, context, filepath):
             parent_name = o.getName()
             ob = ob_dict[parent_name].copy()
             ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(), pivot.yAxis.x(), base.origin.x()),
-                          (pivot.xAxis.z(), pivot.zAxis.z(), pivot.yAxis.z(), base.origin.z()),
+                          (-1 * pivot.xAxis.z(), -1 * pivot.zAxis.z(), -1 * pivot.yAxis.z(), -1 * base.origin.z()),
                           (pivot.xAxis.y(), pivot.zAxis.y(), pivot.yAxis.y(), base.origin.y()),
                           (0.0, 0.0, 0.0, 1.0)]))
 
