@@ -29,6 +29,14 @@ def load(operator, context, filepath):
     time_old = time.time()
     print('\nDone parsing mxs %r in %.4f sec.' % (filepath, (time_new - time_main)))
 
+    materials = {}
+    mat_it = CmaxwellMaterialIterator()
+    mat = mat_it.first(mxs_scene)
+    while mat.isNull() == False:
+        print("Material: %s" % mat.getName())
+        materials[mat.getName()] = bpy.data.materials.new( mat.getName() )
+        mat = mat_it.next()
+
     it = CmaxwellObjectIterator()
     obj = it.first(mxs_scene)
     print(type(obj))
@@ -53,13 +61,16 @@ def load(operator, context, filepath):
                 i = 0
                 num = triangles
                 my_max = 0
+                group_max = 0
                 while i < num:
                     triangle = obj.getTriangle(i)
                     (v1,v2,v3,n1,n2,n3) = triangle
                     my_max = max(my_max,v1,v2,v3)
+                    #group_max = max(obj.getTriangleGroup(i),group_max)
                     faces.append((v1,v2,v3))
                     i = i + 1
                 #print("Triangles: ", triangles , "\tVertices:", my_max ,"\tNormals:", normals, "\tPositions:", positions)
+                #print("Triangle groups:", group_max)
                 i = 0
                 while i <= my_max:
                     vert = obj.getVertex(i,0)
@@ -71,6 +82,7 @@ def load(operator, context, filepath):
                        # Define the faces by index numbers. Each faces is defined by 4 consecutive integers.
                        # For triangles you need to repeat the first vertex also in the fourth position.
                 #faces=[ (2,1,0,3), (0,1,4,0), (1,2,4,1), (2,3,4,2), (3,0,4,3)]
+                print(obj.getMaterial().getName())
                 me = bpy.data.meshes.new(str(n) + name)
                 me.from_pydata(verts,[],faces)   # edges or faces should be [], or you ask for problems
                 me.update(calc_edges=True)    # Update mesh with new data
