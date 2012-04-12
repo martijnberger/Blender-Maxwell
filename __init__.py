@@ -37,7 +37,7 @@ class ImportMXS(bpy.types.Operator, ImportHelper):
     filename_ext = ".mxs"
 
     filter_glob = StringProperty(
-            defaults="*.mxs",
+            default="*.mxs",
             options={'HIDDEN'},
             )
 
