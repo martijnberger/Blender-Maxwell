@@ -82,17 +82,17 @@ def load(operator, context, filepath):
                     me.materials.append(materials[obj.getMaterial().getName()])
                 except KeyError:
                     print("KeyError")
-                me.from_pydata(verts,[],faces)   
+                me.from_pydata(verts, [], faces)
                 # edges or faces should be [], or you ask for problems
                 me.update(calc_edges=True)    # Update mesh with new data
                 ob = bpy.data.objects.new(name, me)
-                ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(), pivot.yAxis.x(), base.origin.x()),
-                              (-1 *pivot.xAxis.z(), -1 * pivot.zAxis.z(), -1 * pivot.yAxis.z(), -1 * base.origin.z()),
-                              (pivot.xAxis.y(),  pivot.zAxis.y(), pivot.yAxis.y(), base.origin.y()),
-                              (0.0, 0.0, 0.0, 1.0)]))
-
-#                ob.scale = [pivot.xAxis.x(), pivot.zAxis.z(), pivot.yAxis.y()]
-#                ob.location = [ base.origin.x(), base.origin.z(), base.origin.y()]
+                ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(),
+                                            pivot.yAxis.x(), base.origin.x()),
+                                  (-1 *pivot.xAxis.z(), -1 * pivot.zAxis.z(),
+                                   -1 * pivot.yAxis.z(), -1 * base.origin.z()),
+                                    (pivot.xAxis.y(),  pivot.zAxis.y(),
+                                     pivot.yAxis.y(), base.origin.y()),
+                                    (0.0, 0.0, 0.0, 1.0)]))
 
                 ob_dict[name] = ob
                 bpy.context.scene.objects.link(ob)
@@ -119,14 +119,14 @@ def load(operator, context, filepath):
             o = obj.getInstanced()
             parent_name = o.getName()
             ob = ob_dict[parent_name].copy()
-            ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(), pivot.yAxis.x(), base.origin.x()),
-                          (-1 * pivot.xAxis.z(), -1 * pivot.zAxis.z(), -1 * pivot.yAxis.z(), -1 * base.origin.z()),
-                          (pivot.xAxis.y(), pivot.zAxis.y(), pivot.yAxis.y(), base.origin.y()),
+            ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(),
+                                        pivot.yAxis.x(), base.origin.x()),
+                            (-1 * pivot.xAxis.z(), -1 * pivot.zAxis.z(),
+                             -1 * pivot.yAxis.z(), -1 * base.origin.z()),
+                            (pivot.xAxis.y(), pivot.zAxis.y(),
+                             pivot.yAxis.y(), base.origin.y()),
                           (0.0, 0.0, 0.0, 1.0)]))
 
-
- #           ob.scale = [pivot.xAxis.x(), pivot.zAxis.z(), pivot.yAxis.y()]
- #           ob.location = [ base.origin.x(), base.origin.z(), base.origin.y()]
             bpy.context.scene.objects.link(ob)
             n = n + 1
 
@@ -135,6 +135,7 @@ def load(operator, context, filepath):
     print('imported %d instance in %.4f sec' % (n, (time_new - time_old)))
 
     print(mxs_scene.getSceneInfo())
-    
-    print('finished importing: %r in %.4f sec.' % (filepath, (time_new - time_main)))
+
+    print('finished importing: %r in %.4f sec.' %
+            (filepath, (time_new - time_main)))
     return {'FINISHED'}
