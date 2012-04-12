@@ -73,10 +73,10 @@ def load(operator, context, filepath):
                     verts.append((vert.x(), vert.z(), vert.y()))
                     i = i + 1
                 for i in range(0, num):
-                    print((obj.getNormal(n1,0), obj.getNormal(n1,0).x,
-                                obj.getNormal(n1,0).z,obj.getNormal(n1,0).y)
+                    print(obj.getNormal(n1, 0), obj.getNormal(n1, 0).x,
+                                obj.getNormal(n1, 0).z, obj.getNormal(n1, 0).y)
                     #vec_n1 = mathutils.Vector
-
+                print(str(n) + name)
                 me = bpy.data.meshes.new(str(n) + name)
                 try:
                     me.materials.append(materials[obj.getMaterial().getName()])
@@ -88,7 +88,7 @@ def load(operator, context, filepath):
                 ob = bpy.data.objects.new(name, me)
                 ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(),
                                             pivot.yAxis.x(), base.origin.x()),
-                                  (-1 *pivot.xAxis.z(), -1 * pivot.zAxis.z(),
+                                  (-1 * pivot.xAxis.z(), -1 * pivot.zAxis.z(),
                                    -1 * pivot.yAxis.z(), -1 * base.origin.z()),
                                     (pivot.xAxis.y(),  pivot.zAxis.y(),
                                      pivot.yAxis.y(), base.origin.y()),
@@ -99,9 +99,9 @@ def load(operator, context, filepath):
 
                 me.update(calc_edges=True)
                 n = n + 1
-                imp=True
+                imp = True
             else:
-                print('NOT DONE:', obj.getName(), ' NULL: ', obj.isNull() )
+                print('NOT DONE:', obj.getName(), ' NULL: ', obj.isNull())
                 print('  ', obj.getNumVertexes(), '  ', obj.getNumTriangles())
         obj = it.next()
         #if imp:
@@ -115,7 +115,7 @@ def load(operator, context, filepath):
     n = 1
     while obj.isNull() == False:
         if(obj.isInstance() == 1):
-            (base,pivot) = obj.getBaseAndPivot()
+            (base, pivot) = obj.getBaseAndPivot()
             o = obj.getInstanced()
             parent_name = o.getName()
             ob = ob_dict[parent_name].copy()
