@@ -73,9 +73,30 @@ def load(operator, context, filepath):
                     verts.append((vert.x(), vert.z(), vert.y()))
                     i = i + 1
                 for i in range(0, num):
-                    print(obj.getNormal(n1, 0), obj.getNormal(n1, 0).x,
-                                obj.getNormal(n1, 0).z, obj.getNormal(n1, 0).y)
-                    #vec_n1 = mathutils.Vector
+                    vec_n1 = mathutils.Vector((obj.getNormal(n1, 0).x(),
+                                               obj.getNormal(n1, 0).z(),
+                                               obj.getNormal(n1, 0).y()))
+                    vec_n2 = mathutils.Vector((obj.getNormal(n2, 0).x(),
+                                               obj.getNormal(n2, 0).z(),
+                                               obj.getNormal(n2, 0).y()))
+                    vec_n3 = mathutils.Vector((obj.getNormal(n3, 0).x(),
+                                               obj.getNormal(n3, 0).z(),
+                                               obj.getNormal(n3, 0).y()))
+                    vec_n = (vec_n1 + vec_n2 + vec_n3) / 3
+                    (v1, v2, v3) = faces[i]
+                    vec_e1 = mathutils.Vector((verts[v2][0] - verts[v1][0],
+                                               verts[v2][1] - verts[v1][1],
+                                               verts[v2][2] - verts[v1][2]))
+                    vec_e2 = mathutils.Vector((verts[v3][0] - verts[v2][0],
+                                               verts[v3][1] - verts[v2][1],
+                                               verts[v3][2] - verts[v2][2]))
+                    vec_cross = vec_e1.cross(vec_e2)
+                    dot = vec_n.dot(vec_cross.normalized())
+                    #print("dot:", vec_n.dot(vec_cross.normalized()))
+                    if(dot < 0.95 or dot > 1.05):
+                        #print("CHANGING VERTEX ORDER")
+                        faces[i] = (v1, v3, v2)
+
                 print(str(n) + name)
                 me = bpy.data.meshes.new(str(n) + name)
                 try:
