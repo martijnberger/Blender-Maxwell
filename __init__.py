@@ -49,7 +49,6 @@ class ImportMXS(bpy.types.Operator, ImportHelper):
                                 "split_mode",
                                 ))
 
-
         return import_mxs.load(self, context, **keywords)
 
     def draw(self, context):
@@ -59,10 +58,12 @@ class ImportMXS(bpy.types.Operator, ImportHelper):
 def menu_func_import(self, context):
     self.layout.operator(ImportMXS.bl_idname, text="Maxwell (.mxs)")
 
+
 def register():
     bpy.utils.register_module(__name__)
 
     bpy.types.INFO_MT_file_import.append(menu_func_import)
+
 
 def unregister():
     bpy.utils.unregister_module(__name__)
