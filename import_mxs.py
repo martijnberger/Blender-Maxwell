@@ -63,7 +63,6 @@ def load(operator, context, filepath):
                 group_max = 0
                 while i < num:
                     triangle = obj.getTriangle(i)
-                    group_max = max(obj.getTriangleGroup(i),group_max)
                     (v1, v2, v3, n1, n2, n3) = triangle
                     my_max = max(my_max, v1, v2, v3)
                     faces.append((v1, v2, v3))
@@ -145,6 +144,51 @@ def load(operator, context, filepath):
                                      pivot.yAxis.y(), base.origin.y()),
                                     (0.0, 0.0, 0.0, 1.0)]))
 
+#=======
+#                for i in range(0, num):
+#                    vec_n1 = mathutils.Vector((obj.getNormal(n1, 0).x(),
+#                                               obj.getNormal(n1, 0).z(),
+#                                               obj.getNormal(n1, 0).y()))
+#                    vec_n2 = mathutils.Vector((obj.getNormal(n2, 0).x(),
+#                                               obj.getNormal(n2, 0).z(),
+#                                               obj.getNormal(n2, 0).y()))
+#                    vec_n3 = mathutils.Vector((obj.getNormal(n3, 0).x(),
+#                                               obj.getNormal(n3, 0).z(),
+#                                               obj.getNormal(n3, 0).y()))
+#                    vec_n = (vec_n1 + vec_n2 + vec_n3) / 3
+#                    (v1, v2, v3) = faces[i]
+#                    vec_e1 = mathutils.Vector((verts[v2][0] - verts[v1][0],
+#                                               verts[v2][1] - verts[v1][1],
+#                                               verts[v2][2] - verts[v1][2]))
+#                    vec_e2 = mathutils.Vector((verts[v3][0] - verts[v2][0],
+#                                               verts[v3][1] - verts[v2][1],
+#                                               verts[v3][2] - verts[v2][2]))
+#                    vec_cross = vec_e1.cross(vec_e2)
+#                    dot = vec_n.dot(vec_cross.normalized())
+#                    #print("dot:", vec_n.dot(vec_cross.normalized()))
+#                    if(dot < 0.95 or dot > 1.05):
+#                        #print("CHANGING VERTEX ORDER")
+#                        faces[i] = (v1, v3, v2)
+#
+#                print(str(n) + name)
+#                me = bpy.data.meshes.new(str(n) + name)
+#                try:
+#                    me.materials.append(materials[obj.getMaterial().getName()])
+#                except KeyError:
+#                    print("KeyError")
+#                me.from_pydata(verts, [], faces)
+#                # edges or faces should be [], or you ask for problems
+#                me.update(calc_edges=True)    # Update mesh with new data
+#                ob = bpy.data.objects.new(name, me)
+#                ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(),
+#                                            pivot.yAxis.x(), base.origin.x()),
+#                                  (-1 * pivot.xAxis.z(), -1 * pivot.zAxis.z(),
+#                                   -1 * pivot.yAxis.z(), -1 * base.origin.z()),
+#                                    (pivot.xAxis.y(),  pivot.zAxis.y(),
+#                                     pivot.yAxis.y(), base.origin.y()),
+#                                    (0.0, 0.0, 0.0, 1.0)]))
+#
+#>>>>>>> 04d2e1fb87256f297161cd9fc615cfe2c97c24b1
                 ob_dict[name] = ob
                 bpy.context.scene.objects.link(ob)
 
