@@ -77,10 +77,7 @@ def export_camera(camera, mxs_scene, res_x, res_y):
     return mxs_camera
 
 def export_mesh(mesh, me, mxs_scene):
-    #current_obj = mesh
-    #make sure we have tessfaces
-    #current_obj.data.update(calc_tessface=True) 
-    
+    # some structures to keep stuff while we figure out how much it is
     verts = {}
     normals = {}
     faces = []
@@ -101,7 +98,10 @@ def export_mesh(mesh, me, mxs_scene):
         if(len(face.vertices) == 4):
             faces.append((face.vertices[2],face.vertices[3],face.vertices[0]))
 
+    #create actual maxwell object
     mxs_object = mxs_scene.createMesh(mesh.name, len(verts), len(normals),len(faces),1) 
+
+    #dump in stuff into the object
     for i, v in verts.items():
         mxs_object.setVertex(i, 0, v)
 
@@ -110,5 +110,22 @@ def export_mesh(mesh, me, mxs_scene):
 
     for i, f in enumerate(faces):
         mxs_object.setTriangle(i, f[0], f[1], f[2], f[0], f[1], f[2])
+
+    #construct base and pivot we need to account for transformations
+    #setBaseAndPivot(Cbase base, Cbase pivot, float substepTime = 0.0 )
+    m = mesh.matrix_world
+    base_o = Cvector(m[0][3],m[1][3],m[2][3])
+    base_x = Cvector(m[0][0],m[1][0],m[2][0])
+    base_y = Cvector(m[0][1],m[1][1],m[2][1])
+    base_z = Cvector(m[0][2],m[1][2],m[2][2])
+    base = Cbase(base_o,base_x,base_y,base_z)
+
+    pivot_o = Cvector(0,0,0)
+    pivot_x = Cvector(1,0,0)
+    pivot_y = Cvector(0,1,0) 
+    pivot_z = Cvector(0,0,1)
+    pivot = Cbase(pivot_o,pivot_x,pivot_y,pivot_z)
+    mxs_object.setBaseAndPivot(base,pivot)
+
 
       
