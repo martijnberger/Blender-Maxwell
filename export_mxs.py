@@ -3,6 +3,7 @@ import os
 import time
 import bpy
 import mathutils
+import math
 
 from mathutils import Matrix
 from bpy_extras.io_utils import unpack_list, unpack_face_list
@@ -25,7 +26,10 @@ def save(operator, context, filepath=""):
                                           round(context.scene.render.resolution_y * (context.scene.render.resolution_percentage / 100)) )
     res.setActive()
 
-    export_mesh(context.scene.objects['Cube'],mxs_scene)
+    for o in context.scene.objects:
+        if(o.type == 'MESH'):
+            me = o.to_mesh(context.scene, True, 'RENDER')
+            export_mesh(o, me, mxs_scene)
 
     print(mxs_scene.getSceneInfo())
 
@@ -62,34 +66,37 @@ def export_camera(camera, mxs_scene, res_x, res_y):
     
     #figure out position, rot and look-at
     position = Cvector()
-    position.assign(pos[0],pos[1],pos[2])
+    position.assign(pos[0],pos[2],pos[1])
     up_vec = Cvector()
-    up_vec.assign(up[0],up[1],up[2])
+    up_vec.assign(up[0],up[2],up[1])
     tar_vec = Cvector()
-    tar_vec.assign(direct[0],direct[1],direct[2])
+    tar_vec.assign(direct[0],direct[2],direct[1])
     #set the values as step 0 for now TODO: add motion blur support
-    focal_lenght = 0.00350 # 35 mm
-    mxs_camera.setStep(0,position,tar_vec,up_vec,focal_length,5,0)
+    focal_length = camera.data.lens / 1000
+    mxs_camera.setStep(0,position,tar_vec,up_vec,focal_length,5.6,0)
     return mxs_camera
 
-def export_mesh(mesh, mxs_scene):
-    current_obj = mesh
+def export_mesh(mesh, me, mxs_scene):
+    #current_obj = mesh
     #make sure we have tessfaces
-    current_obj.data.update(calc_tessface=True) 
+    #current_obj.data.update(calc_tessface=True) 
     
     verts = {}
     normals = {}
     faces = []
-    for i, vertex in enumerate(current_obj.data.vertices):
-        print(i,": ", vertex.co)
+    for i, vertex in enumerate(me.vertices):
+        #print(i,": ", vertex.co)
         position = Cvector()
         position.assign(vertex.co[0],vertex.co[1],vertex.co[2])
         normal = Cvector()
-        normal.assign(vertex.normal[0],normal[1],normal[2])
+        # XXX check why we are getting NaN's
+        normal.assign(vertex.normal[0] if not math.isnan(vertex.normal[0]) else 0 ,
+                      vertex.normal[1] if not math.isnan(vertex.normal[1]) else 0,
+                      vertex.normal[2] if not math.isnan(vertex.normal[2]) else 0)
         verts[i] = position
         normals[i] = normal
 
-    for i, face in enumerate(mesh.data.tessfaces):
+    for i, face in enumerate(me.tessfaces):
         faces.append((face.vertices[0],face.vertices[1],face.vertices[2]))
         if(len(face.vertices) == 4):
             faces.append((face.vertices[2],face.vertices[3],face.vertices[0]))
