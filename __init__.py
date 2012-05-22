@@ -29,6 +29,8 @@ from bpy_extras.io_utils import (ExportHelper,
                                  )
 
 from extensions_framework import Addon
+from imp import reload # this can go once its stable
+
 MaxwellAddon = Addon(bl_info)
 
 class ImportMXS(bpy.types.Operator, ImportHelper):
@@ -73,6 +75,7 @@ class ExportMXS(bpy.types.Operator, ExportHelper):
 
     def execute(self, context):
         from . import export_mxs
+        reload(export_mxs)
         keywords = self.as_keywords(ignore=("axis_forward",
                                 "axis_up",
                                 "global_scale",

@@ -12,11 +12,11 @@ from bpy_extras.image_utils import load_image
 from .pymaxwell import *
 
 pi = math.pi
-#TRANSFORM_MATRIX = mathutils.Matrix().Rotation( -pi /2 , 4, 'X') 
+TRANSFORM_MATRIX = mathutils.Matrix().Rotation( pi /2 , 4, 'X') 
 #TRANSFORM_MATRIX *=  mathutils.Matrix(((-1.0, 0.0, 0.0, 0.0),(0.0, 1.0, 0.0, 0.0), (0.0, 0.0,1.0, 0.0), (0.0, 0.0, 0.0, 1.0))) 
 #TRANSFORM_MATRIX = mathutils.Matrix(((0.0, 0.0, 1.0, 0.0),(-1.0, 0.0, 0.0, 0.0), (0.0,-1.0, 1.0, 0.0), (0.0, 0.0, 0.0, 1.0))) 
-TRANSFORM_MATRIX = mathutils.Euler((-pi / 2 , pi ,-pi/2),'XYZ').to_matrix().to_4x4() 
-
+#TRANSFORM_MATRIX = mathutils.Euler((-pi / 2 , pi ,-pi/2),'XYZ').to_matrix().to_4x4() 
+#TRANSFORM_MATRIX =mathutils.Matrix()
 
 def toCvector(vec):
     return Cvector(vec[0],vec[1],vec[2])
@@ -29,7 +29,6 @@ def printDecompose(m):
     print("scale: ", scale)
 
 def save(operator, context, filepath=""):
-
     
     print('\nexporting mxs %r' % filepath)
 
@@ -74,10 +73,11 @@ def save(operator, context, filepath=""):
 
 # export the given Blender camera into the maxwell scene
 def export_camera(camera, mxs_scene, res_x, res_y):
+    #figure out position, rot and look-at
     matrix = camera.matrix_world.copy()
-    pos = TRANSFORM_MATRIX * matrix.col[3] 
-    direct = TRANSFORM_MATRIX * matrix.col[2] 
-    up = pos + TRANSFORM_MATRIX * matrix.col[1]
+    pos = (TRANSFORM_MATRIX * matrix[3])
+    direct = (TRANSFORM_MATRIX * matrix[2]).normalized()
+    up = (pos + (TRANSFORM_MATRIX * matrix[1])).normalized()
    
     sensor_width = 0.0350
     sensor_height = 0.0350 * (res_y / res_x)
@@ -92,13 +92,9 @@ def export_camera(camera, mxs_scene, res_x, res_y):
         print("Adding camera failed")
     mxs_camera = res
     
-    #figure out position, rot and look-at
-    position = Cvector()
-    position.assign(-1 * pos[0],pos[1],pos[2])
-    up_vec = Cvector()
-    up_vec.assign(-1 * up[0],up[1],up[2])
-    tar_vec = Cvector()
-    tar_vec.assign(-1 * direct[0],direct[1],direct[2])
+    position = toCvector(pos)
+    up_vec = toCvector(up)
+    tar_vec = toCvector(direct)
     #set the values as step 0 for now TODO: add motion blur support
     focal_length = camera.data.lens / 1000
     mxs_camera.setStep(0,position,tar_vec,up_vec,focal_length,5.6,0)
@@ -141,22 +137,27 @@ def export_mesh(mesh, me, mxs_scene):
 
     #construct base and pivot we need to account for transformations
     #setBaseAndPivot(Cbase base, Cbase pivot, float substepTime = 0.0 )
-    #base_x = Cvector(m[0][0],m[1][0],m[2][0])
-    #base_y = Cvector(m[0][1],m[1][1],m[2][1])
-    #base_z = Cvector(m[0][2],m[1][2],m[2][2]) 
+    base_o = Cvector(0,0,0)
+    base_x =  Cvector(1,0,0)
+    base_y =  Cvector(0,1,0)
+    base_z =  Cvector(0,0,1) 
+    pivot_o = Cvector(0,0,0)
     pivot_x = Cvector(1,0,0)
     pivot_y = Cvector(0,1,0)
     pivot_z = Cvector(0,0,1) 
     m = mesh.matrix_world.copy()
-
+    mt = (TRANSFORM_MATRIX * m).copy()
+    #print(mesh.name)
+    #printDecompose(m)
+    #printDecompose(mt)
     base_o = toCvector(m.col[3] * TRANSFORM_MATRIX)
-    base_x = toCvector(m[0] * TRANSFORM_MATRIX)
-    base_y = toCvector(m[1] * TRANSFORM_MATRIX) 
-    base_z = toCvector(m[2] * TRANSFORM_MATRIX) 
-    pivot_o = toCvector(m.col[3] * TRANSFORM_MATRIX)
-    pivot_x = toCvector(m[0] * TRANSFORM_MATRIX)
-    pivot_y = toCvector(m[1] * TRANSFORM_MATRIX) 
-    pivot_z = toCvector(m[2] * TRANSFORM_MATRIX) 
+    base_x = toCvector(mt[0])
+    base_y = toCvector(mt[1]) 
+    base_z = toCvector(mt[2]) 
+    #pivot_o = toCvector(m.col[3] * TRANSFORM_MATRIX)
+    #pivot_x = toCvector(mt[0])
+    #pivot_y = toCvector(mt[1]) 
+    #pivot_z = toCvector(mt[2]) 
     base = Cbase(base_o,base_x,base_y,base_z)
     pivot = Cbase(pivot_o,pivot_x,pivot_y,pivot_z)
     #print(base,"\n",pivot,"\n",m)
