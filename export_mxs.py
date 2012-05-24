@@ -12,7 +12,7 @@ from bpy_extras.image_utils import load_image
 from .pymaxwell import *
 
 pi = math.pi
-TRANSFORM_MATRIX = mathutils.Matrix().Rotation( pi /2 , 4, 'X') 
+TRANSFORM_MATRIX = mathutils.Matrix().Rotation( - pi /2 , 4, 'X') 
 #TRANSFORM_MATRIX *=  mathutils.Matrix(((-1.0, 0.0, 0.0, 0.0),(0.0, 1.0, 0.0, 0.0), (0.0, 0.0,1.0, 0.0), (0.0, 0.0, 0.0, 1.0))) 
 #TRANSFORM_MATRIX = mathutils.Matrix(((0.0, 0.0, 1.0, 0.0),(-1.0, 0.0, 0.0, 0.0), (0.0,-1.0, 1.0, 0.0), (0.0, 0.0, 0.0, 1.0))) 
 #TRANSFORM_MATRIX = mathutils.Euler((-pi / 2 , pi ,-pi/2),'XYZ').to_matrix().to_4x4() 
@@ -54,6 +54,8 @@ def save(operator, context, filepath=""):
                                                   round(context.scene.render.resolution_y * (context.scene.render.resolution_percentage / 100)) )
             if(context.scene.camera.name == o.name):
                 res.setActive()
+        elif(o.type == 'EMPTY'):
+            print('ignore: EMPTY')
         else:
             print('ignoring object', o.type)
  
@@ -75,9 +77,9 @@ def save(operator, context, filepath=""):
 def export_camera(camera, mxs_scene, res_x, res_y):
     #figure out position, rot and look-at
     matrix = camera.matrix_world.copy()
-    pos = (TRANSFORM_MATRIX * matrix[3])
-    direct = (TRANSFORM_MATRIX * matrix[2]).normalized()
-    up = (pos + (TRANSFORM_MATRIX * matrix[1])).normalized()
+    pos = (TRANSFORM_MATRIX * matrix.col[3])
+    direct = (TRANSFORM_MATRIX * (matrix.col[3] - matrix.col[2])).normalized()
+    up = (pos + (TRANSFORM_MATRIX * matrix.col[1])).normalized()
    
     sensor_width = 0.0350
     sensor_height = 0.0350 * (res_y / res_x)
