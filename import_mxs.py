@@ -12,6 +12,7 @@ from .pymaxwell import *
 
 
 def load(operator, context, filepath):
+    '''load a maxwell file'''
 
     print('\nimporting mxs %r' % filepath)
 
@@ -38,7 +39,6 @@ def load(operator, context, filepath):
 
     it = CmaxwellObjectIterator()
     obj = it.first(mxs_scene)
-    print(type(obj))
     n = 1
     imp = False
     ob_dict = {}
@@ -53,68 +53,33 @@ def load(operator, context, filepath):
                 (base, pivot) = obj.getBaseAndPivot()
                 triangles = obj.getNumTriangles()
                 vertices = obj.getNumVertexes()
-                normals = obj.getNumNormals()
+                normal_count = obj.getNumNormals()
                 positions = obj.getNumPositionsPerVertex()
                 verts = []
                 faces = []
+                normals = []
+                vert_norm = {}
                 i = 0
                 num = triangles
-                my_max = 0
+                max_vertex = 0
+                max_normal = 0
                 group_max = 0
-                while i < num:
+                for i in range(triangles):
                     triangle = obj.getTriangle(i)
                     (v1, v2, v3, n1, n2, n3) = triangle
-                    my_max = max(my_max, v1, v2, v3)
+                    max_vertex = max(max_vertex, v1, v2, v3)
+                    max_normal = max(max_normal, n1, n2, n3)
                     faces.append((v1, v2, v3))
-                    i = i + 1
-                i = 0
-                while i <= my_max:
+                    vert_norm[v1] = n1
+                    vert_norm[v2] = n2
+                    vert_norm[v3] = n3
+                for i in range(max_vertex + 1):
                     vert = obj.getVertex(i, 0)
                     verts.append((vert.x(), vert.z(), vert.y()))
-                    i = i + 1
-                
-                for i in range(0, num):
-                    if(n1 + n2 + n3 < 1):
-                        continue
-                    if(n1 == n2 == n3):
-                        vec_n = mathutils.Vector((obj.getNormal(n1, 0).x(),
-                                                  obj.getNormal(n1, 0).z(),
-                                                  obj.getNormal(n1, 0).y())).normalized()
-                    else:
-                        vec_n1 = mathutils.Vector((obj.getNormal(n1, 0).x(),
-                                                   obj.getNormal(n1, 0).z(),
-                                                   obj.getNormal(n1, 0).y())).normalized()
-                        vec_n2 = mathutils.Vector((obj.getNormal(n2, 0).x(),
-                                                   obj.getNormal(n2, 0).z(),
-                                                   obj.getNormal(n2, 0).y())).normalized()
-                        vec_n3 = mathutils.Vector((obj.getNormal(n3, 0).x(),
-                                                   obj.getNormal(n3, 0).z(),
-                                                   obj.getNormal(n3, 0).y())).normalized()
-                        vec_n = (vec_n1 + vec_n2 + vec_n3) / 3
-                    
-                    (v1, v2, v3) = faces[i]
-                    vec_u = mathutils.Vector((verts[v2][0] - verts[v1][0],
-                                              verts[v2][1] - verts[v1][1],
-                                              verts[v2][2] - verts[v1][2]))
-                    vec_v = mathutils.Vector((verts[v3][0] - verts[v1][0],
-                                              verts[v3][1] - verts[v1][1],
-                                              verts[v3][2] - verts[v1][2]))
-#                   vec_cross = vec_e1.cross(vec_e2).normalized()
-                    vec_cross = mathutils.Vector(((vec_u.y * vec_v.z) - (vec_u.z * vec_v.y),
-                                                  (vec_u.z * vec_v.x) - (vec_u.x * vec_v.z),
-                                                  (vec_u.x * vec_v.y) - (vec_u.y * vec_v.x))).normalized()
-                    dot = vec_n.dot(vec_cross.normalized())
-                    #print("dot:", vec_n.dot(vec_cross.normalized()))
-                    print( round(dot,2))
-                    if( round(dot,2) < 0):
-#                        print("face normal: ", vec_n)
-#                        print("plane vect", vec_cross)
-                        print("CHANGING VERTEX ORDER", round(dot,2))
-#                        faces[i] = (v3, v2, v1)
-#                    if(abs(round(dot,2)) < 0.95):
-#                        print("smooth_face")
+                for i in range(max_vertex + 1):
+                    n = obj.getNormal(vert_norm[i],0)
+                    normals.append((n.x(), n.z(), n.y())) 
 
-                print(str(n) + name)
                 me = bpy.data.meshes.new(str(n) + name)
                 mat_name = obj.getMaterial().getName()
                 if mat_name != "None":
@@ -125,59 +90,15 @@ def load(operator, context, filepath):
                 #me.from_pydata(verts, [], faces)
                 me.vertices.add(len(verts))
                 me.tessfaces.add(len(faces))
-                
-                print(name ," verts: ", len(unpack_list(verts))/3 ," ", len(verts))
+ 
+                print("{} verts: {}\tfaces: {}\tnormals: {}".format(name, len(verts), len(faces), len(normals)))
+
                 me.vertices.foreach_set("co", unpack_list(verts))
-                print(name, " faces: ", len(unpack_face_list(faces))/4, " ", len(faces))
+                me.vertices.foreach_set("normal",  unpack_list(normals))
                 me.tessfaces.foreach_set("vertices_raw", unpack_face_list(faces))
-                me.update()
+                me.update(calc_edges=True)    # Update mesh with new data
                 me.validate()
 
-                # edges or faces should be [], or you ask for problems
-                me.update(calc_edges=True)    # Update mesh with new data
-                ob = bpy.data.objects.new(name, me)
-                ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(),
-                                            pivot.yAxis.x(), base.origin.x()),
-                                  (-1 * pivot.xAxis.z(), -1 * pivot.zAxis.z(),
-                                   -1 * pivot.yAxis.z(), -1 * base.origin.z()),
-                                    (pivot.xAxis.y(),  pivot.zAxis.y(),
-                                     pivot.yAxis.y(), base.origin.y()),
-                                    (0.0, 0.0, 0.0, 1.0)]))
-
-                for i in range(0, num):
-                    vec_n1 = mathutils.Vector((obj.getNormal(n1, 0).x(),
-                                               obj.getNormal(n1, 0).z(),
-                                               obj.getNormal(n1, 0).y()))
-                    vec_n2 = mathutils.Vector((obj.getNormal(n2, 0).x(),
-                                               obj.getNormal(n2, 0).z(),
-                                               obj.getNormal(n2, 0).y()))
-                    vec_n3 = mathutils.Vector((obj.getNormal(n3, 0).x(),
-                                               obj.getNormal(n3, 0).z(),
-                                               obj.getNormal(n3, 0).y()))
-                    vec_n = (vec_n1 + vec_n2 + vec_n3) / 3
-                    (v1, v2, v3) = faces[i]
-                    vec_e1 = mathutils.Vector((verts[v2][0] - verts[v1][0],
-                                               verts[v2][1] - verts[v1][1],
-                                               verts[v2][2] - verts[v1][2]))
-                    vec_e2 = mathutils.Vector((verts[v3][0] - verts[v2][0],
-                                               verts[v3][1] - verts[v2][1],
-                                               verts[v3][2] - verts[v2][2]))
-                    vec_cross = vec_e1.cross(vec_e2)
-                    dot = vec_n.dot(vec_cross.normalized())
-                    #print("dot:", vec_n.dot(vec_cross.normalized()))
-                    if(dot < 0.95 or dot > 1.05):
-                        #print("CHANGING VERTEX ORDER")
-                        faces[i] = (v1, v3, v2)
-
-                print(str(n) + name)
-                me = bpy.data.meshes.new(str(n) + name)
-                try:
-                    me.materials.append(materials[obj.getMaterial().getName()])
-                except KeyError:
-                    print("KeyError")
-                me.from_pydata(verts, [], faces)
-                # edges or faces should be [], or you ask for problems
-                me.update(calc_edges=True)    # Update mesh with new data
                 ob = bpy.data.objects.new(name, me)
                 ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(),
                                             pivot.yAxis.x(), base.origin.x()),
@@ -189,23 +110,20 @@ def load(operator, context, filepath):
 
                 ob_dict[name] = ob
                 bpy.context.scene.objects.link(ob)
-
                 me.update(calc_edges=True)
-                n = n + 1
-                imp = True
             else:
-                print('NOT DONE:', obj.getName(), ' NULL: ', obj.isNull())
-                print('  ', obj.getNumVertexes(), '  ', obj.getNumTriangles())
+                pass
+                #print('NOT DONE:', obj.getName(), ' NULL: ', obj.isNull())
+                #print('  ', obj.getNumVertexes(), '  ', obj.getNumTriangles())
         obj = it.next()
-        #if imp:
-        #    break
+
     time_new = time.time()
-    print('imported %d objects in %.4f sec' % (n, (time_new - time_old)))
+    print('imported %d objects in %.4f sec' % (len(ob_dict), (time_new - time_old)))
     time_old = time.time()
 
     it = CmaxwellObjectIterator()
     obj = it.first(mxs_scene)
-    n = 1
+    instance_count = 0
     while obj.isNull() == False:
         if(obj.isInstance() == 1):
             (base, pivot) = obj.getBaseAndPivot()
@@ -221,11 +139,11 @@ def load(operator, context, filepath):
                           (0.0, 0.0, 0.0, 1.0)]))
 
             bpy.context.scene.objects.link(ob)
-            n = n + 1
-
+            instance_count += 1
         obj = it.next()
+
     time_new = time.time()
-    print('imported %d instance in %.4f sec' % (n, (time_new - time_old)))
+    print('imported %d instance in %.4f sec' % (instance_count, (time_new - time_old)))
 
     print(mxs_scene.getSceneInfo()," Triangle groups: ",mxs_scene.getTriangleGroupsCount())
 
