@@ -48,6 +48,7 @@ class ImportMXS(bpy.types.Operator, ImportHelper):
 
     def execute(self, context):
         from . import import_mxs
+        reload(import_mxs)
         keywords = self.as_keywords(ignore=("axis_forward",
                                 "axis_up",
                                 "filter_glob",
