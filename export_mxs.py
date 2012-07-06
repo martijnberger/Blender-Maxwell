@@ -1,18 +1,17 @@
+import bpy
 import sys
 import os
 import time
-import bpy
-import mathutils
 import math
 
-from mathutils import Matrix
+from mathutils import Matrix, Vector
 from bpy_extras.io_utils import unpack_list, unpack_face_list
 from bpy_extras.image_utils import load_image
 
 from .pymaxwell import *
 
 pi = math.pi
-TRANSFORM_MATRIX = mathutils.Matrix().Rotation( - pi /2 , 4, 'X') 
+TRANSFORM_MATRIX = mathutils.Matrix().Rotation( -pi /2 , 4, 'X') 
 #TRANSFORM_MATRIX *=  mathutils.Matrix(((-1.0, 0.0, 0.0, 0.0),(0.0, 1.0, 0.0, 0.0), (0.0, 0.0,1.0, 0.0), (0.0, 0.0, 0.0, 1.0))) 
 #TRANSFORM_MATRIX = mathutils.Matrix(((0.0, 0.0, 1.0, 0.0),(-1.0, 0.0, 0.0, 0.0), (0.0,-1.0, 1.0, 0.0), (0.0, 0.0, 0.0, 1.0))) 
 #TRANSFORM_MATRIX = mathutils.Euler((-pi / 2 , pi ,-pi/2),'XYZ').to_matrix().to_4x4() 
@@ -40,16 +39,11 @@ def save(operator, context, filepath=""):
     mxs_scene.setPluginID("Blender Maxwell")
     mxs_scene.setInputDataType('YZXRH')
 
-#camera = context.scene.camera
-#    res = export_camera(camera,mxs_scene, round(context.scene.render.resolution_x * (context.scene.render.resolution_percentage / 100)),
-#                                          round(context.scene.render.resolution_y * (context.scene.render.resolution_percentage / 100)) )
-#    res.setActive()
-
     for o in context.scene.objects:
-        if(o.type == 'MESH'):
+        if(o.type == 'MESH' and o.is_visible(context.scene)):
             me = o.to_mesh(context.scene, True, 'RENDER')
             export_mesh(o, me, mxs_scene)
-        elif(o.type == 'CAMERA'):
+        elif(o.type == 'CAMERA' and o.is_visible(context.scene)):
             res = export_camera(o,mxs_scene, round(context.scene.render.resolution_x * (context.scene.render.resolution_percentage / 100)),
                                                   round(context.scene.render.resolution_y * (context.scene.render.resolution_percentage / 100)) )
             if(context.scene.camera.name == o.name):
@@ -111,13 +105,8 @@ def export_mesh(mesh, me, mxs_scene):
         #print(i,": ", vertex.co)
         position = Cvector()
         position.assign(vertex.co[0],vertex.co[1],vertex.co[2])
-        normal = Cvector()
-        # XXX check why we are getting NaN's
-        normal.assign(vertex.normal[0] if not math.isnan(vertex.normal[0]) else 0 ,
-                      vertex.normal[1] if not math.isnan(vertex.normal[1]) else 0,
-                      vertex.normal[2] if not math.isnan(vertex.normal[2]) else 0)
         verts[i] = position
-        normals[i] = normal
+        normals[i] = toCvector(Vector((vertex.normal[0],vertex.normal[1],vertex.normal[2])).normalized())
 
     for i, face in enumerate(me.tessfaces):
         faces.append((face.vertices[0],face.vertices[1],face.vertices[2]))
@@ -140,9 +129,9 @@ def export_mesh(mesh, me, mxs_scene):
     #construct base and pivot we need to account for transformations
     #setBaseAndPivot(Cbase base, Cbase pivot, float substepTime = 0.0 )
     base_o = Cvector(0,0,0)
-    base_x =  Cvector(1,0,0)
-    base_y =  Cvector(0,1,0)
-    base_z =  Cvector(0,0,1) 
+    base_x = Cvector(1,0,0)
+    base_y = Cvector(0,1,0)
+    base_z = Cvector(0,0,1) 
     pivot_o = Cvector(0,0,0)
     pivot_x = Cvector(1,0,0)
     pivot_y = Cvector(0,1,0)
@@ -152,14 +141,11 @@ def export_mesh(mesh, me, mxs_scene):
     #print(mesh.name)
     #printDecompose(m)
     #printDecompose(mt)
-    base_o = toCvector(m.col[3] * TRANSFORM_MATRIX)
-    base_x = toCvector(mt[0])
-    base_y = toCvector(mt[1]) 
-    base_z = toCvector(mt[2]) 
-    #pivot_o = toCvector(m.col[3] * TRANSFORM_MATRIX)
-    #pivot_x = toCvector(mt[0])
-    #pivot_y = toCvector(mt[1]) 
-    #pivot_z = toCvector(mt[2]) 
+    base_o = toCvector(mt.col[3])
+    pivot_o = toCvector(mt.col[3])
+    pivot_x = toCvector(mt[0])
+    pivot_y = toCvector(mt[1]) 
+    pivot_z = toCvector(mt[2]) 
     base = Cbase(base_o,base_x,base_y,base_z)
     pivot = Cbase(pivot_o,pivot_x,pivot_y,pivot_z)
     #print(base,"\n",pivot,"\n",m)
