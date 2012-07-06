@@ -12,6 +12,7 @@ from .pymaxwell import *
 
 
 def load(operator, context, filepath):
+    '''load a maxwell file'''
 
     print('\nimporting mxs %r' % filepath)
 
@@ -72,15 +73,13 @@ def load(operator, context, filepath):
                     vert_norm[v1] = n1
                     vert_norm[v2] = n2
                     vert_norm[v3] = n3
-                for i in range(max_vertex+1):
+                for i in range(max_vertex + 1):
                     vert = obj.getVertex(i, 0)
                     verts.append((vert.x(), vert.z(), vert.y()))
-                print(max_vertex,max_normal,len(vert_norm))
-                for i in range(max_vertex+1):
+                for i in range(max_vertex + 1):
                     n = obj.getNormal(vert_norm[i],0)
-                    normals.append((n.x(), n.z(), n.y()))
-                
-            
+                    normals.append((n.x(), n.z(), n.y())) 
+
                 me = bpy.data.meshes.new(str(n) + name)
                 mat_name = obj.getMaterial().getName()
                 if mat_name != "None":
@@ -91,7 +90,7 @@ def load(operator, context, filepath):
                 #me.from_pydata(verts, [], faces)
                 me.vertices.add(len(verts))
                 me.tessfaces.add(len(faces))
-                
+ 
                 print("{} verts: {}\tfaces: {}\tnormals: {}".format(name, len(verts), len(faces), len(normals)))
 
                 me.vertices.foreach_set("co", unpack_list(verts))
@@ -141,8 +140,8 @@ def load(operator, context, filepath):
 
             bpy.context.scene.objects.link(ob)
             instance_count += 1
-
         obj = it.next()
+
     time_new = time.time()
     print('imported %d instance in %.4f sec' % (instance_count, (time_new - time_old)))
 
