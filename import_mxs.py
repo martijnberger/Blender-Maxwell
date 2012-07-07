@@ -1,15 +1,36 @@
+import bpy
 import sys
 import os
 import time
-import bpy
-import mathutils
+import math
 
-from mathutils import Matrix
+from mathutils import Matrix, Vector
 from bpy_extras.io_utils import unpack_list, unpack_face_list
 from bpy_extras.image_utils import load_image
 
 from .pymaxwell import *
 
+pi = math.pi
+
+def Cvector2Vector(v):
+  return Vector((v.x(), -1.0 * v.z(), v.y()))
+
+def write_camera(context, camera):
+  origin, focalPoint, up, focalLength, fStop, stepTime = camera.getStep(0)
+  camValues = camera.getValues()
+  print(camera.getName())
+  dir_vect = Cvector2Vector(origin) - Cvector2Vector(focalPoint)
+  q = dir_vect.normalized().rotation_difference(Vector((0,0,-1)))
+  qe = q.to_euler()
+  obj = bpy.ops.object.add(type='CAMERA',
+                     location=Cvector2Vector(origin),
+                     rotation=(qe.x, qe.y, qe.z))
+  ob = bpy.context.object
+  ob.name = camera.getName()
+  cam = ob.data
+  cam.name = camera.getName()
+
+  return
 
 def load(operator, context, filepath):
     '''load a maxwell file'''
@@ -28,6 +49,9 @@ def load(operator, context, filepath):
     time_old = time.time()
     print('\nDone parsing mxs %r in %.4f sec.' %
             (filepath, (time_new - time_main)))
+
+    for cam_name in mxs_scene.getCameraNames():
+      write_camera(context, mxs_scene.getCamera(cam_name))
 
     materials = {}
     mat_it = CmaxwellMaterialIterator()
@@ -130,6 +154,13 @@ def load(operator, context, filepath):
             o = obj.getInstanced()
             parent_name = o.getName()
             ob = ob_dict[parent_name].copy()
+            mat = obj.getMaterial()
+            s = ob.material_slots
+            if mat.isNull() == False:
+              if not mat.getName() == ob.material_slots[0].name:
+                print( mat.getName(), " ", ob.material_slots[0].name)
+                ob.material_slots[0].link = 'OBJECT'
+                ob.material_slots[0].material = materials[mat.getName()]
             ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(),
                                         pivot.yAxis.x(), base.origin.x()),
                             (-1 * pivot.xAxis.z(), -1 * pivot.zAxis.z(),
