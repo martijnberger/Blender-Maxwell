@@ -12,6 +12,26 @@ from .pymaxwell import *
 
 pi = math.pi
 
+def CbasePivot2Matrix(b,p):
+    bscale = b.xAxis.x()
+    if bscale == 0:
+        bscale = 1
+    x = p.xAxis * bscale
+    y = p.yAxis * bscale
+    z = p.zAxis * bscale
+    return Matrix([(x.x(),      z.x(),      y.x(),      b.origin.x()),
+                   (-1 * x.z(), -1 * z.z(), -1 * y.z(), -1 * b.origin.z()),
+                   (x.y(),      z.y(),      y.y(),       b.origin.y()),
+                   (0.0,        0.0,        0.0,        1.0)])
+
+
+def Cbase2Matrix(b):
+    m = Matrix()
+    m.col[0] = Cvector2Vector(b.xAxis).to_4d()
+    m.col[1] = Cvector2Vector(b.zAxis).to_4d()
+    m.col[2] = Cvector2Vector(b.yAxis).to_4d()
+    return m
+
 def Cvector2Vector(v):
   return Vector((v.x(), -1.0 * v.z(), v.y()))
 
@@ -20,14 +40,25 @@ def write_camera(context, camera):
   camValues = camera.getValues()
   print(camera.getName())
   dir_vect = Cvector2Vector(origin) - Cvector2Vector(focalPoint)
-  q = dir_vect.normalized().rotation_difference(Vector((0,0,-1)))
+  q = dir_vect.normalized().rotation_difference((0,0,-1))
   qe = q.to_euler()
   obj = bpy.ops.object.add(type='CAMERA',
                      location=Cvector2Vector(origin),
                      rotation=(qe.x, qe.y, qe.z))
   ob = bpy.context.object
+  up2 = (ob.matrix_world.col[3].normalized() + ob.matrix_world.col[1].normalized()).normalized().to_3d()
+  axis = dir_vect
+  angle = up2.angle(Cvector2Vector(up))
+  axis = (axis[0], axis[1], axis[2])
+  print(angle, axis) 
+  bpy.ops.transform.rotate(value=(angle,),axis=axis)
   ob.name = camera.getName()
   cam = ob.data
+  cam.lens = focalLength * 1000 # Maxwell lens is in meters
+  # Cycles
+  cam.cycles.aperture_fstop = fStop
+  # Luxrender
+  #cam.luxrender_camera.fstop = fStop
   cam.name = camera.getName()
 
   return
@@ -124,17 +155,22 @@ def load(operator, context, filepath):
                 me.validate()
 
                 ob = bpy.data.objects.new(name, me)
-                ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(),
-                                            pivot.yAxis.x(), base.origin.x()),
-                                  (-1 * pivot.xAxis.z(), -1 * pivot.zAxis.z(),
-                                   -1 * pivot.yAxis.z(), -1 * base.origin.z()),
-                                    (pivot.xAxis.y(),  pivot.zAxis.y(),
-                                     pivot.yAxis.y(), base.origin.y()),
-                                    (0.0, 0.0, 0.0, 1.0)]))
-
+#                ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(),
+#                                   pivot.yAxis.x(), base.origin.x()),
+#                                    (-1 * pivot.xAxis.z(), -1 * pivot.zAxis.z(),
+#                                   -1 * pivot.yAxis.z(), -1 * base.origin.z()),
+#                                    (pivot.xAxis.y(),  pivot.zAxis.y(),
+#                                     pivot.yAxis.y(), base.origin.y()),
+#                                    (0.0, 0.0, 0.0, 1.0)]))
+#                print(ob.matrix_basis)
+#                print(CbasePivot2Matrix(base,pivot))
+                ob.matrix_basis = CbasePivot2Matrix(base,pivot)
                 ob_dict[name] = ob
+                if len(verts) > 5000:
+                    ob.draw_type = 'BOUNDS'
                 bpy.context.scene.objects.link(ob)
                 me.update(calc_edges=True)
+                #return {'FINISHED'}
             else:
                 pass
                 #print('NOT DONE:', obj.getName(), ' NULL: ', obj.isNull())
@@ -154,6 +190,9 @@ def load(operator, context, filepath):
             o = obj.getInstanced()
             parent_name = o.getName()
             ob = ob_dict[parent_name].copy()
+            ob.matrix_basis = CbasePivot2Matrix(base,pivot)
+            if len(ob.data.vertices) > 5000:
+                ob.draw_type = 'BOUNDS'
             mat = obj.getMaterial()
             s = ob.material_slots
             if mat.isNull() == False:
@@ -168,7 +207,6 @@ def load(operator, context, filepath):
                             (pivot.xAxis.y(), pivot.zAxis.y(),
                              pivot.yAxis.y(), base.origin.y()),
                           (0.0, 0.0, 0.0, 1.0)]))
-
             bpy.context.scene.objects.link(ob)
             instance_count += 1
         obj = it.next()
