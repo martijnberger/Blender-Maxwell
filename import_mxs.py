@@ -13,24 +13,26 @@ from .pymaxwell import *
 pi = math.pi
 
 def CbasePivot2Matrix(b,p):
-    bscale = b.xAxis.x()
-    if bscale == 0:
-        bscale = 1
-    x = p.xAxis * bscale
-    y = p.yAxis * bscale
-    z = p.zAxis * bscale
-    return Matrix([(x.x(),      z.x(),      y.x(),      b.origin.x()),
-                   (-1 * x.z(), -1 * z.z(), -1 * y.z(), -1 * b.origin.z()),
-                   (x.y(),      z.y(),      y.y(),       b.origin.y()),
-                   (0.0,        0.0,        0.0,        1.0)])
+  '''Calculate a transformation matrix based on a MXS base and pivot'''
+  bscale = b.xAxis.x() #TODO we should build a matrix out of whole base and pivot
+  if bscale == 0: # some items are scaled by base rather then by pivot
+    bscale = 1
+  x = p.xAxis * bscale
+  y = p.yAxis * bscale
+  z = p.zAxis * bscale
+  return Matrix([(x.x(),      z.x(),      y.x(),      b.origin.x()),
+                 (-1 * x.z(), -1 * z.z(), -1 * y.z(), -1 * b.origin.z()),
+                 (x.y(),      z.y(),      y.y(),       b.origin.y()),
+                 (0.0,        0.0,        0.0,        1.0)])
 
 
 def Cbase2Matrix(b):
-    m = Matrix()
-    m.col[0] = Cvector2Vector(b.xAxis).to_4d()
-    m.col[1] = Cvector2Vector(b.zAxis).to_4d()
-    m.col[2] = Cvector2Vector(b.yAxis).to_4d()
-    return m
+  '''Create a Blender Matrix() from a Maxwell CBase'''
+  m = Matrix()
+  m.col[0] = Cvector2Vector(b.xAxis).to_4d()
+  m.col[1] = Cvector2Vector(b.zAxis).to_4d()
+  m.col[2] = Cvector2Vector(b.yAxis).to_4d()
+  return m
 
 def Cvector2Vector(v):
   return Vector((v.x(), -1.0 * v.z(), v.y()))
@@ -46,22 +48,103 @@ def write_camera(context, camera):
                      location=Cvector2Vector(origin),
                      rotation=(qe.x, qe.y, qe.z))
   ob = bpy.context.object
-  up2 = (ob.matrix_world.col[3].normalized() + ob.matrix_world.col[1].normalized()).normalized().to_3d()
-  axis = dir_vect
-  angle = up2.angle(Cvector2Vector(up))
-  axis = (axis[0], axis[1], axis[2])
-  print(angle, axis) 
-  bpy.ops.transform.rotate(value=(angle,),axis=axis)
+  up2 = ob.matrix_world.col[1].to_3d()
+  dir = ob.matrix_world.col[3] - ob.matrix_world.col[2]
+  rot_diff = up2.rotation_difference(Cvector2Vector(up))
+  ob.rotation_euler.rotate(rot_diff)
   ob.name = camera.getName()
   cam = ob.data
   cam.lens = focalLength * 1000 # Maxwell lens is in meters
+  cam.sensor_height = camValues['filmHeight'] * 1000.0
+  cam.sensor_width = camValues['filmWidth'] * 1000.0
+  shift_x, shift_y = camera.getShiftLens()
+  cam.shift_x = shift_x / 100.0
+  cam.shift_y = shift_y / -100.0
   # Cycles
   cam.cycles.aperture_fstop = fStop
   # Luxrender
   #cam.luxrender_camera.fstop = fStop
   cam.name = camera.getName()
 
-  return
+
+def write_mesh(context, obj, materials):
+  if(obj.getNumTriangles() > 0 or obj.getNumVertexes() > 0):
+    try:
+        name = obj.getName()
+    except UnicodeDecodeError:
+        obj.setName('corrupt' + str(n))
+        name = 'corrupt' + str(n)
+    (base, pivot) = obj.getBaseAndPivot()
+    triangles = obj.getNumTriangles()
+    vertices = obj.getNumVertexes()
+    normal_count = obj.getNumNormals()
+    positions = obj.getNumPositionsPerVertex()
+    verts = []
+    faces = []
+    normals = []
+    vert_norm = {}
+    mats = {}
+    mat_index = []
+    i = 0
+    num = triangles
+    max_vertex = 0
+    max_normal = 0
+    group_max = 0
+    for i in range(triangles):
+        triangle = obj.getTriangle(i)
+        (v1, v2, v3, n1, n2, n3) = triangle
+        max_vertex = max(max_vertex, v1, v2, v3)
+        max_normal = max(max_normal, n1, n2, n3)
+        mat = obj.getTriangleMaterial(i)
+        if not mat.isNull():
+          mat_name = mat.getName()
+          if not mat_name in mats:
+            mats[mat_name] = len(mats)
+          mat_index.append(mats[mat_name])
+        else:
+          mat_index.append(0)
+        faces.append((v1, v2, v3))
+        vert_norm[v1] = n1
+        vert_norm[v2] = n2
+        vert_norm[v3] = n3
+    for i in range(max_vertex + 1):
+        vert = obj.getVertex(i, 0)
+        verts.append((vert.x(), vert.z(), vert.y()))
+    for i in range(max_vertex + 1):
+        n = obj.getNormal(vert_norm[i],0)
+        normals.append((n.x(), n.z(), n.y())) 
+
+    me = bpy.data.meshes.new(str(n) + name)
+    me.vertices.add(len(verts))
+    me.tessfaces.add(len(faces))
+    if len(mats) >= 1:
+        for k in mats.keys():
+            me.materials.append(materials[k])
+            print("Cant Find Material {} setting {} instead".format(mat_name, k ))
+    else:
+        print("WARNING OBJECT {} HAS NO MATERIAL".format(obj.getName()))
+
+    #print("{} verts: {}\tfaces: {}\tnormals: {}".format(name, len(verts), len(faces), len(normals)))
+
+    me.vertices.foreach_set("co", unpack_list(verts))
+    me.vertices.foreach_set("normal",  unpack_list(normals))
+    me.tessfaces.foreach_set("vertices_raw", unpack_face_list(faces))
+    me.tessfaces.foreach_set("material_index", mat_index) 
+    me.update(calc_edges=True)    # Update mesh with new data
+    me.validate()
+
+    ob = bpy.data.objects.new(name, me)
+    ob.matrix_basis = CbasePivot2Matrix(base,pivot)
+    if len(verts) > 5000:
+        ob.draw_type = 'BOUNDS'
+    bpy.context.scene.objects.link(ob)
+    me.update(calc_edges=True)
+    return (name, ob)
+  else:
+    print('NOT DONE:', obj.getName(), ' NULL: ', obj.isNull())
+    print('  ', obj.getNumVertexes(), '  ', obj.getNumTriangles())
+  return (False, False) 
+
 
 def load(operator, context, filepath):
     '''load a maxwell file'''
@@ -98,83 +181,9 @@ def load(operator, context, filepath):
     imp = False
     ob_dict = {}
     while obj.isNull() == False:
-        if(obj.isMesh() == 1):
-            if(obj.getNumTriangles() > 0 or obj.getNumVertexes() > 0):
-                try:
-                    name = obj.getName()
-                except UnicodeDecodeError:
-                    obj.setName('corrupt' + str(n))
-                    name = 'corrupt' + str(n)
-                (base, pivot) = obj.getBaseAndPivot()
-                triangles = obj.getNumTriangles()
-                vertices = obj.getNumVertexes()
-                normal_count = obj.getNumNormals()
-                positions = obj.getNumPositionsPerVertex()
-                verts = []
-                faces = []
-                normals = []
-                vert_norm = {}
-                i = 0
-                num = triangles
-                max_vertex = 0
-                max_normal = 0
-                group_max = 0
-                for i in range(triangles):
-                    triangle = obj.getTriangle(i)
-                    (v1, v2, v3, n1, n2, n3) = triangle
-                    max_vertex = max(max_vertex, v1, v2, v3)
-                    max_normal = max(max_normal, n1, n2, n3)
-                    faces.append((v1, v2, v3))
-                    vert_norm[v1] = n1
-                    vert_norm[v2] = n2
-                    vert_norm[v3] = n3
-                for i in range(max_vertex + 1):
-                    vert = obj.getVertex(i, 0)
-                    verts.append((vert.x(), vert.z(), vert.y()))
-                for i in range(max_vertex + 1):
-                    n = obj.getNormal(vert_norm[i],0)
-                    normals.append((n.x(), n.z(), n.y())) 
-
-                me = bpy.data.meshes.new(str(n) + name)
-                mat_name = obj.getMaterial().getName()
-                if mat_name != "None":
-                    try:
-                        me.materials.append(materials[obj.getMaterial().getName()])
-                    except KeyError:
-                        print("Cant Find Material", mat_name)
-                #me.from_pydata(verts, [], faces)
-                me.vertices.add(len(verts))
-                me.tessfaces.add(len(faces))
- 
-                print("{} verts: {}\tfaces: {}\tnormals: {}".format(name, len(verts), len(faces), len(normals)))
-
-                me.vertices.foreach_set("co", unpack_list(verts))
-                me.vertices.foreach_set("normal",  unpack_list(normals))
-                me.tessfaces.foreach_set("vertices_raw", unpack_face_list(faces))
-                me.update(calc_edges=True)    # Update mesh with new data
-                me.validate()
-
-                ob = bpy.data.objects.new(name, me)
-#                ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(),
-#                                   pivot.yAxis.x(), base.origin.x()),
-#                                    (-1 * pivot.xAxis.z(), -1 * pivot.zAxis.z(),
-#                                   -1 * pivot.yAxis.z(), -1 * base.origin.z()),
-#                                    (pivot.xAxis.y(),  pivot.zAxis.y(),
-#                                     pivot.yAxis.y(), base.origin.y()),
-#                                    (0.0, 0.0, 0.0, 1.0)]))
-#                print(ob.matrix_basis)
-#                print(CbasePivot2Matrix(base,pivot))
-                ob.matrix_basis = CbasePivot2Matrix(base,pivot)
-                ob_dict[name] = ob
-                if len(verts) > 5000:
-                    ob.draw_type = 'BOUNDS'
-                bpy.context.scene.objects.link(ob)
-                me.update(calc_edges=True)
-                #return {'FINISHED'}
-            else:
-                pass
-                #print('NOT DONE:', obj.getName(), ' NULL: ', obj.isNull())
-                #print('  ', obj.getNumVertexes(), '  ', obj.getNumTriangles())
+        if obj.isMesh() == 1:
+          name, ob = write_mesh(context,obj,materials)
+          ob_dict[name] = ob
         obj = it.next()
 
     time_new = time.time()
@@ -200,13 +209,7 @@ def load(operator, context, filepath):
                 print( mat.getName(), " ", ob.material_slots[0].name)
                 ob.material_slots[0].link = 'OBJECT'
                 ob.material_slots[0].material = materials[mat.getName()]
-            ob.matrix_basis = (Matrix([(pivot.xAxis.x(), pivot.zAxis.x(),
-                                        pivot.yAxis.x(), base.origin.x()),
-                            (-1 * pivot.xAxis.z(), -1 * pivot.zAxis.z(),
-                             -1 * pivot.yAxis.z(), -1 * base.origin.z()),
-                            (pivot.xAxis.y(), pivot.zAxis.y(),
-                             pivot.yAxis.y(), base.origin.y()),
-                          (0.0, 0.0, 0.0, 1.0)]))
+            ob.matrix_basis = CbasePivot2Matrix(base,pivot)
             bpy.context.scene.objects.link(ob)
             instance_count += 1
         obj = it.next()
