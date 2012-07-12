@@ -7,6 +7,7 @@ import math
 from mathutils import Matrix, Vector
 from bpy_extras.io_utils import unpack_list, unpack_face_list
 from bpy_extras.image_utils import load_image
+from collections import OrderedDict
 
 from .pymaxwell import *
 
@@ -79,12 +80,14 @@ def write_mesh(context, obj, materials):
     vertices = obj.getNumVertexes()
     normal_count = obj.getNumNormals()
     positions = obj.getNumPositionsPerVertex()
+    uv_layer_count = obj.getNumChannelsUVW()
     verts = []
     faces = []
     normals = []
     vert_norm = {}
     mats = {}
     mat_index = []
+    uvs = []
     i = 0
     num = triangles
     max_vertex = 0
@@ -107,6 +110,9 @@ def write_mesh(context, obj, materials):
         vert_norm[v1] = n1
         vert_norm[v2] = n2
         vert_norm[v3] = n3
+        if uv_layer_count > 0:
+          u1, v1, w1, u2, v2, w2, u3, v3, w3 = obj.getTriangleUVW(i, 0)
+          uvs.append(( u1, v1, u2, v2, u3, v3, 0.0, 0.0 ))
     for i in range(max_vertex + 1):
         vert = obj.getVertex(i, 0)
         verts.append((vert.x(), vert.z(), vert.y()))
@@ -118,7 +124,8 @@ def write_mesh(context, obj, materials):
     me.vertices.add(len(verts))
     me.tessfaces.add(len(faces))
     if len(mats) >= 1:
-        for k in mats.keys():
+        mats_sorted = OrderedDict(sorted(mats.items(), key=lambda x: x[1]))
+        for k in mats_sorted.keys():
             me.materials.append(materials[k])
             print("Cant Find Material {} setting {} instead".format(mat_name, k ))
     else:
@@ -130,6 +137,11 @@ def write_mesh(context, obj, materials):
     me.vertices.foreach_set("normal",  unpack_list(normals))
     me.tessfaces.foreach_set("vertices_raw", unpack_face_list(faces))
     me.tessfaces.foreach_set("material_index", mat_index) 
+    if len(uvs) > 0:
+        me.tessface_uv_textures.new()
+        for i in range(len(uvs)):
+            me.tessface_uv_textures[0].data[i].uv_raw = uvs[i]
+
     me.update(calc_edges=True)    # Update mesh with new data
     me.validate()
 
