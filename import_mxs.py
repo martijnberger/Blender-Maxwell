@@ -162,6 +162,7 @@ def load(operator, context, filepath):
     '''load a maxwell file'''
 
     print('\nimporting mxs %r' % filepath)
+    basepath, mxs_filename = os.path.split(filepath)
 
     time_main = time.time()
     mxs_scene = Cmaxwell(mwcallback)
@@ -184,7 +185,29 @@ def load(operator, context, filepath):
     mat = mat_it.first(mxs_scene)
     while mat.isNull() == False:
         print("Material: %s" % mat.getName())
-        materials[mat.getName()] = bpy.data.materials.new(mat.getName())
+        bmat = bpy.data.materials.new(mat.getName())
+        r, g, b = 0.0, 0.0, 0.0
+        textures = {}
+        if mat.getNumLayers() > 0:
+            layer = mat.getLayer(0)
+            if layer.getNumBSDFs() > 0:
+                bsdf = layer.getBSDF(0)
+                refl = bsdf.getReflectance()
+                color = refl.getColor('color')
+                r, g, b = color.rgb.r(), color.rgb.g(), color.rgb.b()
+#                tex_path = color.pFileName
+#                if not tex_path == 'no file':
+#                    i = load_image(tex_path, basepath)
+#                    bpy.data.images.append(i)
+#                    print(tex_path)
+                print(r,g,b)
+        bmat.diffuse_color = (r, g, b)
+        bmat.use_nodes = True
+#        if len(textures > 0):
+#          for t, path in textures.values():
+#            n = bmat.node_tree_nodes.new('Image Texture')
+#            #n.image = bpy.data.images[path]
+        materials[mat.getName()] = bmat
         mat = mat_it.next()
 
     it = CmaxwellObjectIterator()
