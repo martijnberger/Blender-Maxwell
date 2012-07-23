@@ -195,18 +195,21 @@ def load(operator, context, filepath):
                 refl = bsdf.getReflectance()
                 color = refl.getColor('color')
                 r, g, b = color.rgb.r(), color.rgb.g(), color.rgb.b()
-#                tex_path = color.pFileName
-#                if not tex_path == 'no file':
-#                    i = load_image(tex_path, basepath)
-#                    bpy.data.images.append(i)
-#                    print(tex_path)
+                tex_path = color.pFileName
+                if tex_path and not tex_path == 'no file':
+                    print("LOADING: ", tex_path)
+                    i = load_image(tex_path.replace("\\","/"), basepath)
+                    if i:
+                        textures[tex_path] = i
+#                   bpy.data.images.append(i)
                 print(r,g,b)
         bmat.diffuse_color = (r, g, b)
-        bmat.use_nodes = True
-#        if len(textures > 0):
-#          for t, path in textures.values():
-#            n = bmat.node_tree_nodes.new('Image Texture')
-#            #n.image = bpy.data.images[path]
+        if len(textures) > 0:
+          print(textures)
+          bmat.use_nodes = True
+          n = bmat.node_tree.nodes.new('TEX_IMAGE')
+          n.image = textures[tex_path]
+          bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
         materials[mat.getName()] = bmat
         mat = mat_it.next()
 
