@@ -69,6 +69,7 @@ def write_camera(context, camera):
 
 
 def write_mesh(context, obj, materials):
+  n = 0
   if(obj.getNumTriangles() > 0 or obj.getNumVertexes() > 0):
     try:
         name = obj.getName()
@@ -127,7 +128,7 @@ def write_mesh(context, obj, materials):
         mats_sorted = OrderedDict(sorted(mats.items(), key=lambda x: x[1]))
         for k in mats_sorted.keys():
             me.materials.append(materials[k])
-            print("Cant Find Material {} setting {} instead".format(mat_name, k ))
+#            print("setting {}".format(mat_name, k ))
     else:
         print("WARNING OBJECT {} HAS NO MATERIAL".format(obj.getName()))
 
@@ -179,12 +180,13 @@ def load(operator, context, filepath):
 
     for cam_name in mxs_scene.getCameraNames():
       write_camera(context, mxs_scene.getCamera(cam_name))
+    context.scene.camera = bpy.data.objects[mxs_scene.getActiveCamera().getName()]
 
     materials = {}
     mat_it = CmaxwellMaterialIterator()
     mat = mat_it.first(mxs_scene)
     while mat.isNull() == False:
-        print("Material: %s" % mat.getName())
+#        print("Material: %s" % mat.getName())
         bmat = bpy.data.materials.new(mat.getName())
         r, g, b = 0.0, 0.0, 0.0
         textures = {}
@@ -202,7 +204,7 @@ def load(operator, context, filepath):
                     if i:
                         textures[tex_path] = i
 #                   bpy.data.images.append(i)
-                print(r,g,b)
+#                print(r,g,b)
         bmat.diffuse_color = (r, g, b)
         if len(textures) > 0:
           print(textures)
