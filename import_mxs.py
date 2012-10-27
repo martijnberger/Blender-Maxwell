@@ -88,6 +88,7 @@ def write_camera(context, camera):
 
 
 def write_mesh(context, obj, materials):
+  n = 0
   if(obj.getNumTriangles() > 0 or obj.getNumVertexes() > 0):
     try:
         name = obj.getName()
@@ -146,7 +147,7 @@ def write_mesh(context, obj, materials):
         mats_sorted = OrderedDict(sorted(mats.items(), key=lambda x: x[1]))
         for k in mats_sorted.keys():
             me.materials.append(materials[k])
-            print("Cant Find Material {} setting {} instead".format(mat_name, k ))
+#            print("setting {}".format(mat_name, k ))
     else:
         print("WARNING OBJECT {} HAS NO MATERIAL".format(obj.getName()))
 
@@ -198,12 +199,13 @@ def load(operator, context, filepath):
 
     for cam_name in mxs_scene.getCameraNames():
       write_camera(context, mxs_scene.getCamera(cam_name))
+    context.scene.camera = bpy.data.objects[mxs_scene.getActiveCamera().getName()]
 
     materials = {}
     mat_it = CmaxwellMaterialIterator()
     mat = mat_it.first(mxs_scene)
     while mat.isNull() == False:
-        print("Material: %s" % mat.getName())
+#        print("Material: %s" % mat.getName())
         bmat = bpy.data.materials.new(mat.getName())
         r, g, b = 0.0, 0.0, 0.0
         textures = {}
@@ -214,18 +216,29 @@ def load(operator, context, filepath):
                 refl = bsdf.getReflectance()
                 color = refl.getColor('color')
                 r, g, b = color.rgb.r(), color.rgb.g(), color.rgb.b()
-#                tex_path = color.pFileName
-#                if not tex_path == 'no file':
-#                    i = load_image(tex_path, basepath)
-#                    bpy.data.images.append(i)
-#                    print(tex_path)
-                print(r,g,b)
+                tex_path = color.pFileName
+                if tex_path and not tex_path == 'no file':
+                    print("LOADING: ", tex_path)
+                    i = load_image(tex_path.replace("\\","/"), basepath)
+                    if i:
+                        textures[tex_path] = i
+#                   bpy.data.images.append(i)
+#                print(r,g,b)
         bmat.diffuse_color = (r, g, b)
+<<<<<<< HEAD
 #        bmat.use_nodes = True
 #        if len(textures > 0):
 #          for t, path in textures.values():
 #            n = bmat.node_tree_nodes.new('Image Texture')
 #            #n.image = bpy.data.images[path]
+=======
+        if len(textures) > 0:
+          print(textures)
+          bmat.use_nodes = True
+          n = bmat.node_tree.nodes.new('TEX_IMAGE')
+          n.image = textures[tex_path]
+          bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
+>>>>>>> 7dea1c612241b58fdd34124e3c3ab8a342f8f18d
         materials[mat.getName()] = bmat
         mat = mat_it.next()
 
