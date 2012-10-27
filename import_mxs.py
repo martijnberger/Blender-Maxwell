@@ -21,19 +21,38 @@ def CbasePivot2Matrix(b,p):
   x = p.xAxis * bscale
   y = p.yAxis * bscale
   z = p.zAxis * bscale
+  bm, pm = Cbase2Matrix(b), Cbase2Matrix(p)
+  n = pm * bm
+#  print(b , p, new)
   return Matrix([(x.x(),      z.x(),      y.x(),      b.origin.x()),
                  (-1 * x.z(), -1 * z.z(), -1 * y.z(), -1 * b.origin.z()),
                  (x.y(),      z.y(),      y.y(),       b.origin.y()),
+                 (0.0,        0.0,        0.0,        1.0)])
+  return Matrix([(n[0][0],      n[0][1],    n[0][2],    n[0][3]),
+                 (n[1][0],      n[1][1],    n[1][2],    n[1][3]),
+                 (n[2][0],      n[2][1],    n[2][2],    n[2][3]),
                  (0.0,        0.0,        0.0,        1.0)])
 
 
 def Cbase2Matrix(b):
   '''Create a Blender Matrix() from a Maxwell CBase'''
-  m = Matrix()
-  m.col[0] = Cvector2Vector(b.xAxis).to_4d()
-  m.col[1] = Cvector2Vector(b.zAxis).to_4d()
-  m.col[2] = Cvector2Vector(b.yAxis).to_4d()
-  return m
+  x = b.xAxis
+  z = b.zAxis
+  y = b.yAxis
+#  return Matrix([(x.x(),      z.x(),      y.x(),      b.origin.x()),
+#                 (-1 * x.z(), -1 * z.z(), -1 * y.z(), -1 * b.origin.z()),
+#                 (x.y(),      z.y(),      y.y(),       b.origin.y()),
+#                 (0.0,        0.0,        0.0,        1.0)])
+#  return Matrix([(x.x(),      y.x(),      z.x(),      b.origin.x()),
+#                 (x.y(),      y.y(),      z.y(),       b.origin.y()),
+#                 (x.z(),      y.z(),      z.z(),       b.origin.z()),
+#                 (0.0,        0.0,        0.0,        1.0)])
+  return Matrix([(x.x(),      x.y(),      x.z(),      b.origin.x()),
+                 (y.x(),      y.y(),      y.z(),       b.origin.y()),
+                 (z.x(),      z.y(),      z.z(),       b.origin.z()),
+                 (0.0,        0.0,        0.0,        1.0)])
+
+
 
 def Cvector2Vector(v):
   return Vector((v.x(), -1.0 * v.z(), v.y()))
@@ -202,7 +221,7 @@ def load(operator, context, filepath):
 #                    print(tex_path)
                 print(r,g,b)
         bmat.diffuse_color = (r, g, b)
-        bmat.use_nodes = True
+#        bmat.use_nodes = True
 #        if len(textures > 0):
 #          for t, path in textures.values():
 #            n = bmat.node_tree_nodes.new('Image Texture')
