@@ -225,20 +225,12 @@ def load(operator, context, filepath):
 #                   bpy.data.images.append(i)
 #                print(r,g,b)
         bmat.diffuse_color = (r, g, b)
-<<<<<<< HEAD
-#        bmat.use_nodes = True
-#        if len(textures > 0):
-#          for t, path in textures.values():
-#            n = bmat.node_tree_nodes.new('Image Texture')
-#            #n.image = bpy.data.images[path]
-=======
         if len(textures) > 0:
           print(textures)
           bmat.use_nodes = True
           n = bmat.node_tree.nodes.new('TEX_IMAGE')
           n.image = textures[tex_path]
           bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
->>>>>>> 7dea1c612241b58fdd34124e3c3ab8a342f8f18d
         materials[mat.getName()] = bmat
         mat = mat_it.next()
 
