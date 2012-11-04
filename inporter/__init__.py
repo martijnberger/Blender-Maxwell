@@ -1,5 +1,4 @@
 import bpy
-import sys
 import os
 import time
 import math
@@ -9,7 +8,7 @@ from bpy_extras.io_utils import unpack_list, unpack_face_list
 from bpy_extras.image_utils import load_image
 from collections import OrderedDict
 
-from .pymaxwell import *
+from ..pymaxwell import *
 
 pi = math.pi
 
@@ -28,10 +27,10 @@ def CbasePivot2Matrix(b,p):
                  (-1 * x.z(), -1 * z.z(), -1 * y.z(), -1 * b.origin.z()),
                  (x.y(),      z.y(),      y.y(),       b.origin.y()),
                  (0.0,        0.0,        0.0,        1.0)])
-  return Matrix([(n[0][0],      n[0][1],    n[0][2],    n[0][3]),
+'''return Matrix([(n[0][0],      n[0][1],    n[0][2],    n[0][3]),
                  (n[1][0],      n[1][1],    n[1][2],    n[1][3]),
                  (n[2][0],      n[2][1],    n[2][2],    n[2][3]),
-                 (0.0,        0.0,        0.0,        1.0)])
+                 (0.0,        0.0,        0.0,        1.0)])'''
 
 
 def Cbase2Matrix(b):
@@ -53,9 +52,9 @@ def Cbase2Matrix(b):
                  (0.0,        0.0,        0.0,        1.0)])
 
 
-
 def Cvector2Vector(v):
   return Vector((v.x(), -1.0 * v.z(), v.y()))
+
 
 def write_camera(context, camera):
   origin, focalPoint, up, focalLength, fStop, stepTime = camera.getStep(0)
@@ -138,9 +137,9 @@ def write_mesh(context, obj, materials):
         verts.append((vert.x(), vert.z(), vert.y()))
     for i in range(max_vertex + 1):
         n = obj.getNormal(vert_norm[i],0)
-        normals.append((n.x(), n.z(), n.y())) 
+        normals.append((n.x(), n.z(), n.y()))
 
-    me = bpy.data.meshes.new(str(n) + name)
+    me = bpy.data.meshes.new(name)
     me.vertices.add(len(verts))
     me.tessfaces.add(len(faces))
     if len(mats) >= 1:

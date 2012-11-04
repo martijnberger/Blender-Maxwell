@@ -1,23 +1,19 @@
-import bpy
-import sys
-import os
 import time
 import math
 
+import mathutils
 from mathutils import Matrix, Vector
 from bpy_extras.io_utils import unpack_list, unpack_face_list
 from bpy_extras.image_utils import load_image
 
-from .pymaxwell import *
+from ..pymaxwell import *
 
 pi = math.pi
-TRANSFORM_MATRIX = mathutils.Matrix().Rotation( -pi /2 , 4, 'X') 
-#TRANSFORM_MATRIX *=  mathutils.Matrix(((-1.0, 0.0, 0.0, 0.0),(0.0, 1.0, 0.0, 0.0), (0.0, 0.0,1.0, 0.0), (0.0, 0.0, 0.0, 1.0))) 
-#TRANSFORM_MATRIX = mathutils.Matrix(((0.0, 0.0, 1.0, 0.0),(-1.0, 0.0, 0.0, 0.0), (0.0,-1.0, 1.0, 0.0), (0.0, 0.0, 0.0, 1.0))) 
-#TRANSFORM_MATRIX = mathutils.Euler((-pi / 2 , pi ,-pi/2),'XYZ').to_matrix().to_4x4() 
-#TRANSFORM_MATRIX =mathutils.Matrix()
+TRANSFORM_MATRIX = mathutils.Matrix().Rotation( -pi /2 , 4, 'X')  # rotate -90 degree around the x axis
+
 
 def toCvector(vec):
+    '''create a Cvector type from a blender mathutils.Vector'''
     return Cvector(vec[0],vec[1],vec[2])
 
 def printDecompose(m):
@@ -28,7 +24,7 @@ def printDecompose(m):
     print("scale: ", scale)
 
 def save(operator, context, filepath=""):
-    
+    '''main scene exporter logic '''
     print('\nexporting mxs %r' % filepath)
 
     print('Using transform:')
@@ -142,10 +138,10 @@ def export_mesh(mesh, me, mxs_scene):
     #printDecompose(m)
     #printDecompose(mt)
     base_o = toCvector(mt.col[3])
-    pivot_o = toCvector(mt.col[3])
-    pivot_x = toCvector(mt[0])
-    pivot_y = toCvector(mt[1]) 
-    pivot_z = toCvector(mt[2]) 
+    #pivot_o = toCvector(mt.col[3])
+    base_x = toCvector(mt[0])
+    base_y = toCvector(mt[1])
+    base_z = toCvector(mt[2])
     base = Cbase(base_o,base_x,base_y,base_z)
     pivot = Cbase(pivot_o,pivot_x,pivot_y,pivot_z)
     #print(base,"\n",pivot,"\n",m)

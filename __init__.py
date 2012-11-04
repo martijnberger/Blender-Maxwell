@@ -1,3 +1,6 @@
+from . import exporter
+from . import inporter
+
 bl_info = {
     "name": "NextLimit Maxwell format",
     "author": "Martijn Berger",
@@ -12,8 +15,8 @@ bl_info = {
 
 if "bpy" in locals():
     import imp
-    if "import_mxs" in locals():
-        imp.reload(import_mxs)
+    if "importer" in locals():
+        imp.reload(inporter)
 
 
 import bpy
@@ -47,15 +50,15 @@ class ImportMXS(bpy.types.Operator, ImportHelper):
             )
 
     def execute(self, context):
-        from . import import_mxs
-        reload(import_mxs)
+        from . import inporter
+        reload(inporter)
         keywords = self.as_keywords(ignore=("axis_forward",
                                 "axis_up",
                                 "filter_glob",
                                 "split_mode",
                                 ))
 
-        return import_mxs.load(self, context, **keywords)
+        return inporter.load(self, context, **keywords)
 
     def draw(self, context):
         layout = self.layout
@@ -75,8 +78,7 @@ class ExportMXS(bpy.types.Operator, ExportHelper):
             )
 
     def execute(self, context):
-        from . import export_mxs
-        reload(export_mxs)
+        reload(exporter)
         keywords = self.as_keywords(ignore=("axis_forward",
                                 "axis_up",
                                 "global_scale",
@@ -84,7 +86,7 @@ class ExportMXS(bpy.types.Operator, ExportHelper):
                                 "filter_glob",
                                 ))
 
-        return export_mxs.save(self, context, **keywords)
+        return exporter.save(self, context, **keywords)
 
     def draw(self, context):
         layout = self.layout
