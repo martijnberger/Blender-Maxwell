@@ -15,20 +15,18 @@ from ..outputs import MaxwellLog
 pi = math.pi
 
 def CbasePivot2Matrix(b,p):
-  '''Calculate a transformation matrix based on a MXS base and pivot'''
-  bscale = b.xAxis.x() #TODO we should build a matrix out of whole base and pivot
-  if bscale == 0: # some items are scaled by base rather then by pivot
-    bscale = 1
-  x = p.xAxis * bscale
-  y = p.yAxis * bscale
-  z = p.zAxis * bscale
-  return Matrix([(x.x(),      z.x(),      y.x(),      b.origin.x()),
-                 (-1 * x.z(), -1 * z.z(), -1 * y.z(), -1 * b.origin.z()),
-                 (x.y(),      z.y(),      y.y(),       b.origin.y()),
-                 (0.0,        0.0,        0.0,        1.0)])
+    '''Calculate a transformation matrix based on a MXS base and pivot
+       FIXME this breaks if pivot.origin != 0 '''
+    m = Cbase2Matrix3(b) * Cbase2Matrix3(p)
+    x = m[0]
+    y = m[1]
+    z = m[2]
+    return Matrix([(x.x,      z.x,      y.x,      b.origin.x()),
+                   (-1 * x.z, -1 * z.z, -1 * y.z, -1 * b.origin.z()),
+                   (x.y,      z.y,      y.y,       b.origin.y()),
+                   (0.0,        0.0,        0.0,        1.0)])
 
-
-def Cbase2Matrix(b):
+def Cbase2Matrix4(b):
   x = b.xAxis
   z = b.zAxis
   y = b.yAxis
@@ -37,6 +35,13 @@ def Cbase2Matrix(b):
                  (z.x(),      z.y(),      z.z(),       b.origin.z()),
                  (0.0,        0.0,        0.0,        1.0)])
 
+def Cbase2Matrix3(b):
+    x = b.xAxis
+    z = b.zAxis
+    y = b.yAxis
+    return Matrix([(x.x(),      x.y(),      x.z()),
+                   (y.x(),      y.y(),      y.z()),
+                   (z.x(),      z.y(),      z.z())])
 
 def Cvector2Vector(v):
   return Vector((v.x(), -1.0 * v.z(), v.y()))
