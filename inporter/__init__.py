@@ -10,6 +10,8 @@ from collections import OrderedDict
 
 from ..pymaxwell import *
 
+from ..outputs import MaxwellLog
+
 pi = math.pi
 
 def CbasePivot2Matrix(b,p):
@@ -20,32 +22,16 @@ def CbasePivot2Matrix(b,p):
   x = p.xAxis * bscale
   y = p.yAxis * bscale
   z = p.zAxis * bscale
-  bm, pm = Cbase2Matrix(b), Cbase2Matrix(p)
-  n = pm * bm
-#  print(b , p, new)
   return Matrix([(x.x(),      z.x(),      y.x(),      b.origin.x()),
                  (-1 * x.z(), -1 * z.z(), -1 * y.z(), -1 * b.origin.z()),
                  (x.y(),      z.y(),      y.y(),       b.origin.y()),
                  (0.0,        0.0,        0.0,        1.0)])
-'''return Matrix([(n[0][0],      n[0][1],    n[0][2],    n[0][3]),
-                 (n[1][0],      n[1][1],    n[1][2],    n[1][3]),
-                 (n[2][0],      n[2][1],    n[2][2],    n[2][3]),
-                 (0.0,        0.0,        0.0,        1.0)])'''
 
 
 def Cbase2Matrix(b):
-  '''Create a Blender Matrix() from a Maxwell CBase'''
   x = b.xAxis
   z = b.zAxis
   y = b.yAxis
-#  return Matrix([(x.x(),      z.x(),      y.x(),      b.origin.x()),
-#                 (-1 * x.z(), -1 * z.z(), -1 * y.z(), -1 * b.origin.z()),
-#                 (x.y(),      z.y(),      y.y(),       b.origin.y()),
-#                 (0.0,        0.0,        0.0,        1.0)])
-#  return Matrix([(x.x(),      y.x(),      z.x(),      b.origin.x()),
-#                 (x.y(),      y.y(),      z.y(),       b.origin.y()),
-#                 (x.z(),      y.z(),      z.z(),       b.origin.z()),
-#                 (0.0,        0.0,        0.0,        1.0)])
   return Matrix([(x.x(),      x.y(),      x.z(),      b.origin.x()),
                  (y.x(),      y.y(),      y.z(),       b.origin.y()),
                  (z.x(),      z.y(),      z.z(),       b.origin.z()),
@@ -59,7 +45,7 @@ def Cvector2Vector(v):
 def write_camera(context, camera):
   origin, focalPoint, up, focalLength, fStop, stepTime = camera.getStep(0)
   camValues = camera.getValues()
-  print(camera.getName())
+  MaxwellLog(camera.getName())
   dir_vect = Cvector2Vector(origin) - Cvector2Vector(focalPoint)
   q = dir_vect.normalized().rotation_difference((0,0,-1))
   qe = q.to_euler()
@@ -148,7 +134,7 @@ def write_mesh(context, obj, materials):
             me.materials.append(materials[k])
 #            print("setting {}".format(mat_name, k ))
     else:
-        print("WARNING OBJECT {} HAS NO MATERIAL".format(obj.getName()))
+        MaxwellLog("WARNING OBJECT {} HAS NO MATERIAL".format(obj.getName()))
 
     #print("{} verts: {}\tfaces: {}\tnormals: {}".format(name, len(verts), len(faces), len(normals)))
 
@@ -172,39 +158,18 @@ def write_mesh(context, obj, materials):
     me.update(calc_edges=True)
     return (name, ob)
   else:
-    print('NOT DONE:', obj.getName(), ' NULL: ', obj.isNull())
-    print('  ', obj.getNumVertexes(), '  ', obj.getNumTriangles())
+      MaxwellLog('NOT DONE:', obj.getName(), ' NULL: ', obj.isNull())
+      MaxwellLog('  ', obj.getNumVertexes(), '  ', obj.getNumTriangles())
   return (False, False) 
 
 
-def load(operator, context, filepath):
-    '''load a maxwell file'''
 
-    print('\nimporting mxs %r' % filepath)
-    basepath, mxs_filename = os.path.split(filepath)
-
-    time_main = time.time()
-    mxs_scene = Cmaxwell(mwcallback)
-
-    ok = mxs_scene.readMXS(filepath)
-    if ok == 0:
-        print('\nError reading input file: %s' % (filepath))
-        print(mxs_scene.getLastErrorString())
-
-    time_new = time.time()
-    time_old = time.time()
-    print('\nDone parsing mxs %r in %.4f sec.' %
-            (filepath, (time_new - time_main)))
-
-    for cam_name in mxs_scene.getCameraNames():
-      write_camera(context, mxs_scene.getCamera(cam_name))
-    context.scene.camera = bpy.data.objects[mxs_scene.getActiveCamera().getName()]
-
+def write_materials(context, mxs_scene, basepath):
     materials = {}
     mat_it = CmaxwellMaterialIterator()
     mat = mat_it.first(mxs_scene)
     while mat.isNull() == False:
-#        print("Material: %s" % mat.getName())
+        #MaxwellLog("Material: %s" % mat.getName())
         bmat = bpy.data.materials.new(mat.getName())
         r, g, b = 0.0, 0.0, 0.0
         textures = {}
@@ -217,37 +182,25 @@ def load(operator, context, filepath):
                 r, g, b = color.rgb.r(), color.rgb.g(), color.rgb.b()
                 tex_path = color.pFileName
                 if tex_path and not tex_path == 'no file':
-                    print("LOADING: ", tex_path)
+                    MaxwellLog("LOADING: ", tex_path)
                     i = load_image(tex_path.replace("\\","/"), basepath)
                     if i:
                         textures[tex_path] = i
-#                   bpy.data.images.append(i)
-#                print(r,g,b)
+                        #bpy.data.images.append(i)
+                        #MaxwellLog(r,g,b)
         bmat.diffuse_color = (r, g, b)
         if len(textures) > 0:
-          print(textures)
-          bmat.use_nodes = True
-          n = bmat.node_tree.nodes.new('TEX_IMAGE')
-          n.image = textures[tex_path]
-          bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
+            MaxwellLog(textures)
+            bmat.use_nodes = True
+            n = bmat.node_tree.nodes.new('TEX_IMAGE')
+            n.image = textures[tex_path]
+            bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
         materials[mat.getName()] = bmat
         mat = mat_it.next()
+    return materials
 
-    it = CmaxwellObjectIterator()
-    obj = it.first(mxs_scene)
-    n = 1
-    imp = False
-    ob_dict = {}
-    while obj.isNull() == False:
-        if obj.isMesh() == 1:
-          name, ob = write_mesh(context,obj,materials)
-          ob_dict[name] = ob
-        obj = it.next()
-
-    time_new = time.time()
-    print('imported %d objects in %.4f sec' % (len(ob_dict), (time_new - time_old)))
-    time_old = time.time()
-
+def write_instances(context, mxs_scene, ob_dict, materials):
+    t1 = time.time()
     it = CmaxwellObjectIterator()
     obj = it.first(mxs_scene)
     instance_count = 0
@@ -263,20 +216,64 @@ def load(operator, context, filepath):
             mat = obj.getMaterial()
             s = ob.material_slots
             if mat.isNull() == False:
-              if not mat.getName() == ob.material_slots[0].name:
-                print( mat.getName(), " ", ob.material_slots[0].name)
-                ob.material_slots[0].link = 'OBJECT'
-                ob.material_slots[0].material = materials[mat.getName()]
+                if not mat.getName() == ob.material_slots[0].name:
+                    MaxwellLog( mat.getName(), " ", ob.material_slots[0].name)
+                    ob.material_slots[0].link = 'OBJECT'
+                    ob.material_slots[0].material = materials[mat.getName()]
             ob.matrix_basis = CbasePivot2Matrix(base,pivot)
             bpy.context.scene.objects.link(ob)
             instance_count += 1
         obj = it.next()
+    t2 = time.time()
+    MaxwellLog('imported %d instance in %.4f sec' % (instance_count, (t2 - t1)))
+
+def write_objects(context, mxs_scene, materials):
+    t1 = time.time()
+    it = CmaxwellObjectIterator()
+    obj = it.first(mxs_scene)
+    ob_dict = {}
+    while obj.isNull() == False:
+        if obj.isMesh() == 1:
+            name, ob = write_mesh(context,obj,materials)
+            ob_dict[name] = ob
+        obj = it.next()
+    t2 = time.time()
+    MaxwellLog('imported %d objects in %.4f sec' % (len(ob_dict), (t2 - t1)))
+    return ob_dict
+
+def load(operator, context, filepath):
+    '''load a maxwell file'''
+
+    MaxwellLog('importing mxs %r' % filepath)
+    basepath, mxs_filename = os.path.split(filepath)
+
+    time_main = time.time()
+    mxs_scene = Cmaxwell(mwcallback)
+
+    ok = mxs_scene.readMXS(filepath)
+    if ok == 0:
+        MaxwellLog('Error reading input file: %s' % (filepath))
+        MaxwellLog(mxs_scene.getLastErrorString())
 
     time_new = time.time()
-    print('imported %d instance in %.4f sec' % (instance_count, (time_new - time_old)))
+    MaxwellLog('Done parsing mxs %r in %.4f sec.' % (filepath, (time_new - time_main)))
 
-    print(mxs_scene.getSceneInfo()," Triangle groups: ",mxs_scene.getTriangleGroupsCount())
+    for cam_name in mxs_scene.getCameraNames():
+      write_camera(context, mxs_scene.getCamera(cam_name))
+    context.scene.camera = bpy.data.objects[mxs_scene.getActiveCamera().getName()]
 
-    print('finished importing: %r in %.4f sec.' %
-            (filepath, (time_new - time_main)))
+    # READ MATERIALS
+    materials = write_materials(context, mxs_scene, basepath)
+
+    ob_dict = write_objects(context, mxs_scene, materials)
+
+    write_instances(context, mxs_scene, ob_dict, materials)
+
+
+    MaxwellLog(mxs_scene.getSceneInfo()," Triangle groups: ",mxs_scene.getTriangleGroupsCount())
+
+    t2 = time.time()
+    MaxwellLog('finished importing: %r in %.4f sec.' %
+            (filepath, (t2 - time_main)))
     return {'FINISHED'}
+

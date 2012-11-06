@@ -10,4 +10,4 @@ def MaxwellLog(*args, popup=False):
     Accepts variable args
     '''
     if len(args) > 0:
-        log(' '.join(['%s'%a for a in args]), module_name='Mitsuba', popup=popup)
+        log(' '.join(['%s'%a for a in args]), module_name='Maxwell', popup=popup)
