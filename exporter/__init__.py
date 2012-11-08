@@ -26,25 +26,13 @@ def Matrix2CbaseNPivot(m):
 def Matrix2Cbase(m):
     return Cbase(Cvector(0,0,0), toCvector(m.col[0]), toCvector(m.col[1]),toCvector(m.col[2]))
 
-
 def toCvector(vec):
     '''create a Cvector type from a blender mathutils.Vector'''
     return Cvector(vec[0],vec[1],vec[2])
 
-def printDecompose(m):
-    res = ""
-    loc, rot, scale = m.decompose()
-    res += "loc: ".format(loc)
-    res += "rot: %.2f, %.2f, %.2f" % tuple(math.degrees(a) for a in rot.to_euler())
-    res += "scale: ".format(scale)
-    return res
-
 def save(operator, context, filepath=""):
     '''main scene exporter logic '''
     MaxwellLog('exporting mxs %r' % filepath)
-
-    MaxwellLog('Using transform:')
-    MaxwellLog(printDecompose(TRANSFORM_MATRIX))
 
     time_main = time.time()
     mxs_scene = Cmaxwell(mwcallback)
@@ -90,22 +78,19 @@ def save(operator, context, filepath=""):
 # export the given Blender camera into the maxwell scene
 def export_camera(camera, mxs_scene, res_x, res_y):
     #figure out position, rot and look-at
-    matrix = camera.matrix_world.copy()
-    pos = (TRANSFORM_MATRIX * matrix.col[3])
-    direct = (TRANSFORM_MATRIX * (matrix.col[3] - matrix.col[2])).normalized()
-    up = (pos + (TRANSFORM_MATRIX * matrix.col[1])).normalized()
+    matrix = TRANSFORM_MATRIX * camera.matrix_world.copy()
+    pos = (matrix.col[3])
+    direct = ((matrix.col[3] - matrix.col[2]))
+    up = matrix.col[1].to_3d().normalized()
    
-    sensor_width = 0.0350
-    sensor_height = 0.0350 * (res_y / res_x)
-    #               addCamera( name, nSteps, shutter, filmWidth, filmHeight, iso, 
-    #                          diaphragmType,  angle, nBlades, fps, 
-    #                           xRes, yRes, pixelAspect, proyectionType = 0 )   
+    sensor_width = camera.data.sensor_width / 1000.0
+    sensor_height = camera.data.sensor_height / 1000.0
     res = mxs_scene.addCamera( camera.name, 1, 1/100, sensor_width, sensor_height, 100  
                              , "Circular" , (camera.data.angle / math.pi) * 180, 8, 24 
                              , res_x, res_y , 1  , 0 )
-
     if res == 0:
-        print("Adding camera failed")
+        MaxwellLog("Adding camera failed")
+        return
     mxs_camera = res
     
     position = toCvector(pos)
@@ -113,7 +98,8 @@ def export_camera(camera, mxs_scene, res_x, res_y):
     tar_vec = toCvector(direct)
     #set the values as step 0 for now TODO: add motion blur support
     focal_length = camera.data.lens / 1000
-    mxs_camera.setStep(0,position,tar_vec,up_vec,focal_length,5.6,0)
+    fStop = camera.data.cycles.aperture_fstop if camera.data.cycles else 5.6
+    mxs_camera.setStep(0, position, tar_vec, up_vec, focal_length, fStop , 0)
     return mxs_camera
 
 def export_mesh(mesh, me, mxs_scene):
@@ -145,31 +131,8 @@ def export_mesh(mesh, me, mxs_scene):
 
     for i, f in enumerate(faces):
         mxs_object.setTriangle(i, f[0], f[1], f[2], f[0], f[1], f[2])
-    '''
-    #construct base and pivot we need to account for transformations
-    #setBaseAndPivot(Cbase base, Cbase pivot, float substepTime = 0.0 )
-    base_o = Cvector(0,0,0)
-    base_x = Cvector(1,0,0)
-    base_y = Cvector(0,1,0)
-    base_z = Cvector(0,0,1) 
-    pivot_o = Cvector(0,0,0)
-    pivot_x = Cvector(1,0,0)
-    pivot_y = Cvector(0,1,0)
-    pivot_z = Cvector(0,0,1) 
-    m = mesh.matrix_world.copy()
-    mt = (TRANSFORM_MATRIX * m).copy()
-    #print(mesh.name)
-    #printDecompose(m)
-    #printDecompose(mt)
-    base_o = toCvector(mt.col[3])
-    #pivot_o = toCvector(mt.col[3])
-    base_x = toCvector(mt[0])
-    base_y = toCvector(mt[1])
-    base_z = toCvector(mt[2])
-    base = Cbase(base_o,base_x,base_y,base_z)
-    pivot = Cbase(pivot_o,pivot_x,pivot_y,pivot_z)'''
+
     base, pivot = Matrix2CbaseNPivot(mesh.matrix_world)
-    #print(base,"\n",pivot,"\n",m)
     mxs_object.setBaseAndPivot(base,pivot)
 
 
