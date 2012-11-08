@@ -11,24 +11,19 @@ from ..pymaxwell import *
 pi = math.pi
 TRANSFORM_MATRIX = mathutils.Matrix().Rotation( -pi /2 , 4, 'X')  # rotate -90 degree around the x axis
 
-def toCv(v):
-    return Cvector(v[0], v[2] , v[1] * -1.0)
-
 def Matrix2CbaseNPivot(m):
+    m = TRANSFORM_MATRIX * m
     base = Cbase()
-    #base.origin = toCv((m.col[3]))
     base.origin = toCvector(m.col[3])
     base.xAxis = toCvector([1,0,0])
     base.yAxis = toCvector([0,1,0])
     base.zAxis = toCvector([0,0,1])
 
     pivot = Matrix2Cbase(m)
-    #pivot.origin = toCv((m.col[3]))
 
     return base, pivot
 
 def Matrix2Cbase(m):
-    #return Cbase(Cvector(0,0,0), toCv(m.col[0]), toCv(m.col[2]),toCv(m.col[1]))
     return Cbase(Cvector(0,0,0), toCvector(m.col[0]), toCvector(m.col[1]),toCvector(m.col[2]))
 
 
