@@ -1,15 +1,35 @@
 import time
 import math
-
 import mathutils
 from mathutils import Matrix, Vector
-from bpy_extras.io_utils import unpack_list, unpack_face_list
-from bpy_extras.image_utils import load_image
+
+from ..outputs import MaxwellLog
 
 from ..pymaxwell import *
 
+
 pi = math.pi
 TRANSFORM_MATRIX = mathutils.Matrix().Rotation( -pi /2 , 4, 'X')  # rotate -90 degree around the x axis
+
+def toCv(v):
+    return Cvector(v[0], v[2] , v[1] * -1.0)
+
+def Matrix2CbaseNPivot(m):
+    base = Cbase()
+    #base.origin = toCv((m.col[3]))
+    base.origin = toCvector(m.col[3])
+    base.xAxis = toCvector([1,0,0])
+    base.yAxis = toCvector([0,1,0])
+    base.zAxis = toCvector([0,0,1])
+
+    pivot = Matrix2Cbase(m)
+    #pivot.origin = toCv((m.col[3]))
+
+    return base, pivot
+
+def Matrix2Cbase(m):
+    #return Cbase(Cvector(0,0,0), toCv(m.col[0]), toCv(m.col[2]),toCv(m.col[1]))
+    return Cbase(Cvector(0,0,0), toCvector(m.col[0]), toCvector(m.col[1]),toCvector(m.col[2]))
 
 
 def toCvector(vec):
@@ -17,18 +37,19 @@ def toCvector(vec):
     return Cvector(vec[0],vec[1],vec[2])
 
 def printDecompose(m):
-    print("#" * 40)
+    res = ""
     loc, rot, scale = m.decompose()
-    print("loc: ", loc)
-    print("rot: %.2f, %.2f, %.2f" % tuple(math.degrees(a) for a in rot.to_euler()))
-    print("scale: ", scale)
+    res += "loc: ".format(loc)
+    res += "rot: %.2f, %.2f, %.2f" % tuple(math.degrees(a) for a in rot.to_euler())
+    res += "scale: ".format(scale)
+    return res
 
 def save(operator, context, filepath=""):
     '''main scene exporter logic '''
-    print('\nexporting mxs %r' % filepath)
+    MaxwellLog('exporting mxs %r' % filepath)
 
-    print('Using transform:')
-    printDecompose(TRANSFORM_MATRIX)
+    MaxwellLog('Using transform:')
+    MaxwellLog(printDecompose(TRANSFORM_MATRIX))
 
     time_main = time.time()
     mxs_scene = Cmaxwell(mwcallback)
@@ -45,21 +66,29 @@ def save(operator, context, filepath=""):
             if(context.scene.camera.name == o.name):
                 res.setActive()
         elif(o.type == 'EMPTY'):
-            print('ignore: EMPTY')
+            MaxwellLog('ignore: EMPTY')
         else:
-            print('ignoring object', o.type)
+            MaxwellLog('ignoring object', o.type)
  
 
     print(mxs_scene.getSceneInfo())
 
-    ok = mxs_scene.writeMXS(filepath)
+    try:
+        ok = mxs_scene.writeMXS(filepath)
+    except Exception as e:
+        MaxwellLog(e)
+        MaxwellLog("Error saving ")
+        mxs_scene.freeScene()
+        return {'FINISHED'}
+
+
 
     if ok == 0:
-        print("Error saving ")
+        MaxwellLog("Error saving ")
 
     mxs_scene.freeScene()
-    time_new = time.time() 
-    print('finished exporting: %r in %.4f sec.' %
+    time_new = time.time()
+    MaxwellLog('finished exporting: %r in %.4f sec.' %
             (filepath, (time_new - time_main)))
     return {'FINISHED'}
 
@@ -121,7 +150,7 @@ def export_mesh(mesh, me, mxs_scene):
 
     for i, f in enumerate(faces):
         mxs_object.setTriangle(i, f[0], f[1], f[2], f[0], f[1], f[2])
-
+    '''
     #construct base and pivot we need to account for transformations
     #setBaseAndPivot(Cbase base, Cbase pivot, float substepTime = 0.0 )
     base_o = Cvector(0,0,0)
@@ -143,7 +172,8 @@ def export_mesh(mesh, me, mxs_scene):
     base_y = toCvector(mt[1])
     base_z = toCvector(mt[2])
     base = Cbase(base_o,base_x,base_y,base_z)
-    pivot = Cbase(pivot_o,pivot_x,pivot_y,pivot_z)
+    pivot = Cbase(pivot_o,pivot_x,pivot_y,pivot_z)'''
+    base, pivot = Matrix2CbaseNPivot(mesh.matrix_world)
     #print(base,"\n",pivot,"\n",m)
     mxs_object.setBaseAndPivot(base,pivot)
 
