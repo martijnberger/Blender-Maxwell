@@ -68,8 +68,8 @@ def write_camera(context, camera):
   cam.sensor_height = camValues['filmHeight'] * 1000.0
   cam.sensor_width = camValues['filmWidth'] * 1000.0
   shift_x, shift_y = camera.getShiftLens()
-  cam.shift_x = shift_x / 100.0
-  cam.shift_y = shift_y / -100.0
+  cam.shift_x = shift_x / 200.0
+  cam.shift_y = shift_y / -200.0
   # Cycles
   cam.cycles.aperture_fstop = fStop
   # Luxrender
@@ -199,12 +199,59 @@ def write_materials(context, mxs_scene, basepath):
             bmat.use_nodes = True
             n = bmat.node_tree.nodes.new('TEX_IMAGE')
             n.image = textures[tex_path]
-            bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
+            #bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
         materials[mat.getName()] = bmat
         mat = mat_it.next()
     return materials
 
 def write_instances(context, mxs_scene, ob_dict, materials):
+    instances = {}
+    t1 = time.time()
+    it = CmaxwellObjectIterator()
+    obj = it.first(mxs_scene)
+    instance_count = 0
+    while obj.isNull() == False:
+        if(obj.isInstance() == 1):
+            (base, pivot) = obj.getBaseAndPivot()
+            instance_count += 1
+            o = obj.getInstanced()
+            parent_name = o.getName()
+            mat = obj.getMaterial()
+            if mat.isNull() == False:
+                mat = mat.getName()
+            else:
+                mat = 'None'
+            matrix = CbasePivot2Matrix(base,pivot)
+            key = (parent_name, mat)
+            if key in instances:
+                instances[key].append(matrix)
+            else:
+                instances[key] = [matrix]
+        obj = it.next()
+    MaxwellLog("instances {}, object,color instanced {}".format(instance_count,len(instances)))
+
+    imported_count = 0
+    for k, v in instances.items():
+        parent_name, mat = k
+        max_instances = 200
+        if len(v) < max_instances:
+            for w in v:
+                ob = ob_dict[parent_name].copy()
+                ob.matrix_basis = w
+                if len(ob.data.vertices) > 5000:
+                    ob.draw_type = 'BOUNDS'
+                if not mat == 'None':
+                    ob.material_slots[0].link = 'OBJECT'
+                    ob.material_slots[0].material = materials[mat]
+                bpy.context.scene.objects.link(ob)
+                imported_count += 1
+        else:
+            MaxwellLog("{} has more then {} instances skipping: {}".format(parent_name, max_instances,len(v)))
+    t2 = time.time()
+    MaxwellLog('imported %d of of %d instance in %.4f sec' % (imported_count,instance_count, (t2 - t1)))
+    return
+
+    '''
     t1 = time.time()
     it = CmaxwellObjectIterator()
     obj = it.first(mxs_scene)
@@ -222,7 +269,7 @@ def write_instances(context, mxs_scene, ob_dict, materials):
             s = ob.material_slots
             if mat.isNull() == False:
                 if not mat.getName() == ob.material_slots[0].name:
-                    MaxwellLog( mat.getName(), " ", ob.material_slots[0].name)
+                    #MaxwellLog( mat.getName(), " ", ob.material_slots[0].name)
                     ob.material_slots[0].link = 'OBJECT'
                     ob.material_slots[0].material = materials[mat.getName()]
             ob.matrix_basis = CbasePivot2Matrix(base,pivot)
@@ -230,7 +277,7 @@ def write_instances(context, mxs_scene, ob_dict, materials):
             instance_count += 1
         obj = it.next()
     t2 = time.time()
-    MaxwellLog('imported %d instance in %.4f sec' % (instance_count, (t2 - t1)))
+    MaxwellLog('imported %d instance in %.4f sec' % (instance_count, (t2 - t1)))'''
 
 def write_objects(context, mxs_scene, materials):
     t1 = time.time()

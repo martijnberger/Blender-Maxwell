@@ -30,6 +30,8 @@ def toCvector(vec):
     '''create a Cvector type from a blender mathutils.Vector'''
     return Cvector(vec[0],vec[1],vec[2])
 
+object_cache = {}
+
 def save(operator, context, filepath=""):
     '''main scene exporter logic '''
     MaxwellLog('exporting mxs %r' % filepath)
@@ -100,40 +102,58 @@ def export_camera(camera, mxs_scene, res_x, res_y):
     focal_length = camera.data.lens / 1000
     fStop = camera.data.cycles.aperture_fstop if camera.data.cycles else 5.6
     mxs_camera.setStep(0, position, tar_vec, up_vec, focal_length, fStop , 0)
+    shift_x,  shift_y =  camera.data.shift_x * 200.0, camera.data.shift_y * -200.0
+    mxs_camera.setShiftLens(shift_x,  shift_y)
     return mxs_camera
 
-def export_mesh(mesh, me, mxs_scene):
-    # some structures to keep stuff while we figure out how much it is
-    verts = {}
-    normals = {}
-    faces = []
-    for i, vertex in enumerate(me.vertices):
-        #print(i,": ", vertex.co)
-        position = Cvector()
-        position.assign(vertex.co[0],vertex.co[1],vertex.co[2])
-        verts[i] = position
-        normals[i] = toCvector(Vector((vertex.normal[0],vertex.normal[1],vertex.normal[2])).normalized())
+def export_mesh(object, me, mxs_scene):
 
-    for i, face in enumerate(me.tessfaces):
-        faces.append((face.vertices[0],face.vertices[1],face.vertices[2]))
-        if(len(face.vertices) == 4):
-            faces.append((face.vertices[2],face.vertices[3],face.vertices[0]))
+    global object_cache
+    mesh_cache_key = object.data
 
-    #create actual maxwell object
-    mxs_object = mxs_scene.createMesh(mesh.name, len(verts), len(normals),len(faces),1) 
+    if mesh_cache_key in object_cache:
+        MaxwellLog("Could have instanced {}".format(mesh_cache_key))
+        orig_mxs_object, i = object_cache[mesh_cache_key]
+        i += 1
+        name = object.name + str(i)
+        MaxwellLog(i)
+        mxs_object = mxs_scene.createInstancement(name,orig_mxs_object)
+        object_cache[mesh_cache_key] = (orig_mxs_object, i)
+    else:
+        # some structures to keep stuff while we figure out how much it is
+        verts = {}
+        normals = {}
+        faces = []
+        for i, vertex in enumerate(me.vertices):
+            #print(i,": ", vertex.co)
+            position = Cvector()
+            position.assign(vertex.co[0],vertex.co[1],vertex.co[2])
+            verts[i] = position
+            normals[i] = toCvector(Vector((vertex.normal[0],vertex.normal[1],vertex.normal[2])).normalized())
 
-    #dump in stuff into the object
-    for i, v in verts.items():
-        mxs_object.setVertex(i, 0, v)
+        for i, face in enumerate(me.tessfaces):
+            faces.append((face.vertices[0],face.vertices[1],face.vertices[2]))
+            if(len(face.vertices) == 4):
+                faces.append((face.vertices[2],face.vertices[3],face.vertices[0]))
 
-    for i, n in normals.items():
-        mxs_object.setNormal(i, 0, n)
+        #create actual maxwell object
+        mxs_object = mxs_scene.createMesh(object.name, len(verts), len(normals),len(faces),1)
 
-    for i, f in enumerate(faces):
-        mxs_object.setTriangle(i, f[0], f[1], f[2], f[0], f[1], f[2])
+        #dump in stuff into the object
+        for i, v in verts.items():
+            mxs_object.setVertex(i, 0, v)
 
-    base, pivot = Matrix2CbaseNPivot(mesh.matrix_world)
+        for i, n in normals.items():
+            mxs_object.setNormal(i, 0, n)
+
+        for i, f in enumerate(faces):
+            mxs_object.setTriangle(i, f[0], f[1], f[2], f[0], f[1], f[2])
+
+    base, pivot = Matrix2CbaseNPivot(object.matrix_world)
     mxs_object.setBaseAndPivot(base,pivot)
+    if not mesh_cache_key in object_cache:
+        object_cache[mesh_cache_key] = (mxs_object, 0)
+
 
 
       
