@@ -1,11 +1,45 @@
 import time
 import math
+import bpy
 import mathutils
 from mathutils import Matrix, Vector
-
+from bpy_extras.io_utils import ExportHelper
 from ..outputs import MaxwellLog
+from bpy.props import StringProperty
 
 from ..pymaxwell import *
+from .. import MaxwellRenderAddon
+
+@MaxwellRenderAddon.addon_register_class
+class ExportMXS(bpy.types.Operator, ExportHelper):
+    '''export as NextLimit Maxwell MXS file'''
+    bl_idname = "export_scene.mxs"
+    bl_label = "Export MXS"
+    bl_options = {'PRESET'}
+
+    filename_ext = ".mxs"
+
+    filter_glob = StringProperty(
+        default="*.mxs",
+        options={'HIDDEN'},
+    )
+
+    def execute(self, context):
+        keywords = self.as_keywords(ignore=("axis_forward",
+                                            "axis_up",
+                                            "global_scale",
+                                            "check_existing",
+                                            "filter_glob",
+            ))
+
+        return save(self, context, **keywords)
+
+    def draw(self, context):
+        layout = self.layout
+
+
+menu_func = lambda self, context: self.layout.operator(ExportMXS.bl_idname, text="Export Maxwell Scene (.mxs)")
+bpy.types.INFO_MT_file_export.append(menu_func)
 
 
 pi = math.pi

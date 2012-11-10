@@ -1,115 +1,56 @@
-from . import exporter
-from . import inporter
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, see <http://www.gnu.org/licenses/>.
+#
+# ***** END GPL LICENCE BLOCK *****
+#
 
 bl_info = {
-    "name": "NextLimit Maxwell format",
+    "name": "NextLimit Maxwell importer/exporter",
     "author": "Martijn Berger",
-    "version": (0, 0, 1, 'dev'),
-    "blender": (2, 6, 2),
+    "version": (0, 0, 2, 'dev'),
+    "blender": (2, 6, 4),
     "description": "Render scenes with Maxwell render and import/export MXS",
     "warning": "Very early preview",
     "wiki_url": "http://www.nextlimit.com",
     "tracker_url": "",
     "category": "Render",
-    "location": "Render > Engine > Maxwell"}
+    "location": "Info Header > Engine dropdown menu"}
 
-if "bpy" in locals():
+
+if 'core' in locals():
     import imp
-    if "importer" in locals():
-        imp.reload(inporter)
+    imp.reload(core)
+elif 'importer' in locals():
+    import imp
+    imp.reload(importer)
+elif 'exporter' in locals():
+    import imp
+    imp.reload(exporter)
+else:
+    import bpy
 
+    from extensions_framework import Addon
+    MaxwellRenderAddon = Addon(bl_info)
+    register, unregister = MaxwellRenderAddon.init_functions()
 
-import bpy
-from bpy.props import (BoolProperty,
-                       FloatProperty,
-                       StringProperty,
-                       EnumProperty,
-                       )
-from bpy_extras.io_utils import (ExportHelper,
-                                 ImportHelper,
-                                 path_reference_mode,
-                                 axis_conversion,
-                                 )
+    # Importing the core package causes extensions_framework managed
+    # RNA class registration via @MaxwellRenderAddon.addon_register_class
+    from . import core
 
-from extensions_framework import Addon
-from imp import reload # this can go once its stable
-
-MaxwellAddon = Addon(bl_info)
-
-class ImportMXS(bpy.types.Operator, ImportHelper):
-    '''load a NextLimit Maxwell MXS file'''
-    bl_idname = "import_scene.mxs"
-    bl_label = "Import MXS"
-    bl_options = {'PRESET', 'UNDO'}
-
-    filename_ext = ".mxs"
-
-    filter_glob = StringProperty(
-            default="*.mxs",
-            options={'HIDDEN'},
-            )
-
-    def execute(self, context):
-        from . import inporter
-        reload(inporter)
-        keywords = self.as_keywords(ignore=("axis_forward",
-                                "axis_up",
-                                "filter_glob",
-                                "split_mode",
-                                ))
-
-        return inporter.load(self, context, **keywords)
-
-    def draw(self, context):
-        layout = self.layout
-
-
-class ExportMXS(bpy.types.Operator, ExportHelper):
-    '''export as NextLimit Maxwell MXS file'''
-    bl_idname = "export_scene.mxs"
-    bl_label = "Export MXS"
-    bl_options = {'PRESET'}
-
-    filename_ext = ".mxs"
-
-    filter_glob = StringProperty(
-            default="*.mxs",
-            options={'HIDDEN'},
-            )
-
-    def execute(self, context):
-        reload(exporter)
-        keywords = self.as_keywords(ignore=("axis_forward",
-                                "axis_up",
-                                "global_scale",
-                                "check_existing",
-                                "filter_glob",
-                                ))
-
-        return exporter.save(self, context, **keywords)
-
-    def draw(self, context):
-        layout = self.layout
-
-        
-def menu_func_import(self, context):
-    self.layout.operator(ImportMXS.bl_idname, text="Maxwell (.mxs)")
-
-
-def menu_func_export(self, context):
-    self.layout.operator(ExportMXS.bl_idname, text="Maxwell (.mxs)")
-    
-
-def register():
-    bpy.utils.register_module(__name__)
-
-    bpy.types.INFO_MT_file_import.append(menu_func_import)
-    bpy.types.INFO_MT_file_export.append(menu_func_export)
+    from . import exporter
+    from . import importer
 
 
 
-def unregister():
-    bpy.utils.unregister_module(__name__)
 
-    bpy.types.INFO_MT_file_import.remove(menu_func_import)
-    bpy.types.INFO_MT_file_export.remove(menu_func_export)
+
