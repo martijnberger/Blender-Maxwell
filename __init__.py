@@ -30,12 +30,6 @@ bl_info = {
 if 'core' in locals():
     import imp
     imp.reload(core)
-elif 'importer' in locals():
-    import imp
-    imp.reload(importer)
-elif 'exporter' in locals():
-    import imp
-    imp.reload(exporter)
 else:
     import bpy
 
@@ -47,8 +41,6 @@ else:
     # RNA class registration via @MaxwellRenderAddon.addon_register_class
     from . import core
 
-    from . import exporter
-    from . import importer
 
 
 
