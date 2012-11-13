@@ -301,13 +301,15 @@ class SceneImporter():
                     l = (m.col[3][0], m.col[3][1], m.col[3][2])
                     key = (m[0][0], m[0][1], m[0][2], m[1][0], m[1][1], m[1][2], m[2][0], m[2][1], m[2][2])
                     if key in locations:
-                        locations[key].append(l)
+                        t = locations[key][1]
+                        locations[key][0].append((l[0] - t[0],l[1] - t[1],l[2] - t[2] ))
                     else:
-                        locations[key] = [l]
+                        locations[key] = ([(0,0,0)], l)
 
 
 
-                for trans, verts in locations.items():
+                for trans, ver in locations.items():
+                    verts, t = ver
                     MaxwellLog("{} {}: {} locations".format(k[0], trans, len(verts)))
                     dme = bpy.data.meshes.new(k[0])
                     dme.vertices.add(len(verts))
@@ -316,12 +318,15 @@ class SceneImporter():
                     dme.validate()
                     dob = bpy.data.objects.new("DUPLI" + k[0], dme)
                     dob.dupli_type = 'VERTS'
+                    dmatrix = Matrix.Identity(4)
+                    dmatrix.col[3] = t[0], t[1], t[2], 1
+                    dob.matrix_basis = dmatrix
 
                     w = Matrix([(trans[0], trans[1], trans[2]), (trans[3], trans[4], trans[5]), (trans[6], trans[7], trans[8])])
                     ob, inv_matrix = self.ob_dict[parent_name]
                     ob = ob.copy()
                     ls = (w * inv_matrix.to_3x3() ).to_4x4()
-                    ls.col[3] = 0,0,0,1
+                    ls.col[3] = verts[0][0],verts[0][1],verts[0][2],1
                     ob.matrix_basis = ls
                     if len(ob.data.vertices) > 5000:
                         ob.draw_type = 'BOUNDS'
