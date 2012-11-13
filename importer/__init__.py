@@ -201,12 +201,17 @@ class SceneImporter():
         ob.matrix_basis = CbasePivot2Matrix(base,pivot)
         if len(verts) > 5000:
             ob.draw_type = 'BOUNDS'
+
+        inv_matrix = ob.matrix_basis.inverted()
         bpy.context.scene.objects.link(ob)
+        bpy.context.scene.objects.active = ob
+        ob.select = True
+        bpy.ops.object.transform_apply(rotation=True,scale=True)
+        ob.select = False
         me.update(calc_edges=True)
-        return (name, ob)
+        return (name, (ob, inv_matrix))
       else:
-          MaxwellLog('NOT DONE:', obj.getName(), ' NULL: ', obj.isNull())
-          MaxwellLog('  ', obj.getNumVertexes(), '  ', obj.getNumTriangles())
+          MaxwellLog('NOT DONE:', obj.getName(), ' NULL: ', obj.isNull(), '  ', obj.getNumVertexes(), '  ', obj.getNumTriangles())
       return (False, False)
 
 
@@ -277,8 +282,11 @@ class SceneImporter():
             max_instances = 200
             if len(v) < max_instances:
                 for w in v:
-                    ob = self.ob_dict[parent_name].copy()
-                    ob.matrix_basis = w
+                    ob, inv_matrix = self.ob_dict[parent_name]
+                    ob = ob.copy()
+                    ls = (w.to_3x3() * inv_matrix.to_3x3() ).to_4x4()
+                    ls.col[3] = w.col[3]
+                    ob.matrix_basis = ls
                     if len(ob.data.vertices) > 5000:
                         ob.draw_type = 'BOUNDS'
                     if not mat == 'None':
@@ -288,6 +296,44 @@ class SceneImporter():
                     imported_count += 1
             else:
                 MaxwellLog("{} has more then {} instances skipping: {}".format(parent_name, max_instances,len(v)))
+                locations = {}
+                for m in v:
+                    l = (m.col[3][0], m.col[3][1], m.col[3][2])
+                    key = (m[0][0], m[0][1], m[0][2], m[1][0], m[1][1], m[1][2], m[2][0], m[2][1], m[2][2])
+                    if key in locations:
+                        locations[key].append(l)
+                    else:
+                        locations[key] = [l]
+
+
+
+                for trans, verts in locations.items():
+                    MaxwellLog("{} {}: {} locations".format(k[0], trans, len(verts)))
+                    dme = bpy.data.meshes.new(k[0])
+                    dme.vertices.add(len(verts))
+                    dme.vertices.foreach_set("co", unpack_list(verts))
+                    dme.update(calc_edges=True)    # Update mesh with new data
+                    dme.validate()
+                    dob = bpy.data.objects.new("DUPLI" + k[0], dme)
+                    dob.dupli_type = 'VERTS'
+
+                    w = Matrix([(trans[0], trans[1], trans[2]), (trans[3], trans[4], trans[5]), (trans[6], trans[7], trans[8])])
+                    ob, inv_matrix = self.ob_dict[parent_name]
+                    ob = ob.copy()
+                    ls = (w * inv_matrix.to_3x3() ).to_4x4()
+                    ls.col[3] = 0,0,0,1
+                    ob.matrix_basis = ls
+                    if len(ob.data.vertices) > 5000:
+                        ob.draw_type = 'BOUNDS'
+                    if not mat == 'None':
+                        ob.material_slots[0].link = 'OBJECT'
+                        ob.material_slots[0].material = self.materials[mat]
+
+                    ob.parent=dob
+                    bpy.context.scene.objects.link(dob)
+                    bpy.context.scene.objects.link(ob)
+
+
         t2 = time.time()
         MaxwellLog('imported %d of of %d instance in %.4f sec' % (imported_count,instance_count, (t2 - t1)))
         return
