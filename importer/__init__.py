@@ -279,21 +279,24 @@ class SceneImporter():
         imported_count = 0
         for k, v in instances.items():
             parent_name, mat = k
-            max_instances = 200
+            max_instances = 5
             if len(v) < max_instances:
                 for w in v:
-                    ob, inv_matrix = self.ob_dict[parent_name]
-                    ob = ob.copy()
-                    ls = (w.to_3x3() * inv_matrix.to_3x3() ).to_4x4()
-                    ls.col[3] = w.col[3]
-                    ob.matrix_basis = ls
-                    if len(ob.data.vertices) > 5000:
-                        ob.draw_type = 'BOUNDS'
-                    if not mat == 'None':
-                        ob.material_slots[0].link = 'OBJECT'
-                        ob.material_slots[0].material = self.materials[mat]
-                    bpy.context.scene.objects.link(ob)
-                    imported_count += 1
+                    try:
+                        ob, inv_matrix = self.ob_dict[parent_name]
+                        ob = ob.copy()
+                        ls = (w.to_3x3() * inv_matrix.to_3x3() ).to_4x4()
+                        ls.col[3] = w.col[3]
+                        ob.matrix_basis = ls
+                        if len(ob.data.vertices) > 5000:
+                            ob.draw_type = 'BOUNDS'
+                        if not mat == 'None':
+                            ob.material_slots[0].link = 'OBJECT'
+                            ob.material_slots[0].material = self.materials[mat]
+                        bpy.context.scene.objects.link(ob)
+                        imported_count += 1
+                    except KeyError as e:
+                        pass
             else:
                 MaxwellLog("{} has more then {} instances skipping: {}".format(parent_name, max_instances,len(v)))
                 locations = {}
