@@ -164,7 +164,7 @@ class SceneImporter():
             vert_norm[v3] = n3
             if uv_layer_count > 0:
               u1, v1, w1, u2, v2, w2, u3, v3, w3 = obj.getTriangleUVW(i, 0)
-              uvs.append(( u1, v1, u2, v2, u3, v3, 0.0, 0.0 ))
+              uvs.append(( u1, -1.0 * v1, u2, -1.0 * v2, u3, -1.0 * v3, 0.0, 0.0 ))
         for i in range(max_vertex + 1):
             vert = obj.getVertex(i, 0)
             verts.append((vert.x(), vert.z(), vert.y()))
@@ -246,7 +246,7 @@ class SceneImporter():
                 bmat.use_nodes = True
                 n = bmat.node_tree.nodes.new('TEX_IMAGE')
                 n.image = textures[tex_path]
-                #bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
+                bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
             self.materials[mat.getName()] = bmat
             mat = mat_it.next()
 
@@ -280,6 +280,8 @@ class SceneImporter():
         for k, v in instances.items():
             parent_name, mat = k
             max_instances = 5
+            if not parent_name in self.ob_dict:
+                continue
             if len(v) < max_instances:
                 for w in v:
                     try:
@@ -313,7 +315,7 @@ class SceneImporter():
 
                 for trans, ver in locations.items():
                     verts, t = ver
-                    MaxwellLog("{} {}: {} locations".format(k[0], trans, len(verts)))
+                    MaxwellLog("{} : {} locations".format(k[0], len(verts)))
                     dme = bpy.data.meshes.new(k[0])
                     dme.vertices.add(len(verts))
                     dme.vertices.foreach_set("co", unpack_list(verts))
