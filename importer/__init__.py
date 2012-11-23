@@ -98,7 +98,7 @@ class SceneImporter():
       obj = bpy.ops.object.add(type='CAMERA',
                          location=Cvector2Vector(origin),
                          rotation=(qe.x, qe.y, qe.z))
-      ob = bpy.context.object
+      ob = self.context.object
       up2 = ob.matrix_world.col[1].to_3d()
       dir = ob.matrix_world.col[3] - ob.matrix_world.col[2]
       rot_diff = up2.rotation_difference(Cvector2Vector(up))
@@ -203,8 +203,8 @@ class SceneImporter():
             ob.draw_type = 'BOUNDS'
 
         inv_matrix = ob.matrix_basis.inverted()
-        bpy.context.scene.objects.link(ob)
-        bpy.context.scene.objects.active = ob
+        self.context.scene.objects.link(ob)
+        self.context.scene.objects.active = ob
         ob.select = True
         bpy.ops.object.transform_apply(rotation=True,scale=True)
         ob.select = False
@@ -295,7 +295,7 @@ class SceneImporter():
                         if not mat == 'None':
                             ob.material_slots[0].link = 'OBJECT'
                             ob.material_slots[0].material = self.materials[mat]
-                        bpy.context.scene.objects.link(ob)
+                        self.context.scene.objects.link(ob)
                         imported_count += 1
                     except KeyError as e:
                         pass
@@ -340,8 +340,8 @@ class SceneImporter():
                         ob.material_slots[0].material = self.materials[mat]
 
                     ob.parent=dob
-                    bpy.context.scene.objects.link(dob)
-                    bpy.context.scene.objects.link(ob)
+                    self.context.scene.objects.link(dob)
+                    self.context.scene.objects.link(ob)
 
 
         t2 = time.time()
