@@ -8,10 +8,8 @@ from .. import MaxwellRenderAddon
 from ..outputs import MaxwellLog
 
 from ..properties import render
-
 from ..importer import ImportMXS
 from ..exporter import ExportMXS
-
 from ..ui import render_panel
 
 def _register_elm(elm, required=False):

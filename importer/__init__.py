@@ -11,7 +11,8 @@ from bpy.props import StringProperty
 from collections import OrderedDict
 from .. import MaxwellRenderAddon
 
-from ..pymaxwell import *
+from ..maxwell import maxwell
+#from ..pymaxwell import *
 from ..outputs import MaxwellLog
 
 pi = math.pi
@@ -23,30 +24,30 @@ def CbasePivot2Matrix(b,p):
     x = m[0]
     y = m[1]
     z = m[2]
-    return Matrix([(x.x,      z.x,      y.x,      b.origin.x()),
-                   (-1 * x.z, -1 * z.z, -1 * y.z, -1 * b.origin.z()),
-                   (x.y,      z.y,      y.y,       b.origin.y()),
+    return Matrix([(x.x,      z.x,      y.x,      b.origin.x),
+                   (-1 * x.z, -1 * z.z, -1 * y.z, -1 * b.origin.z),
+                   (x.y,      z.y,      y.y,       b.origin.y),
                    (0.0,        0.0,        0.0,        1.0)])
 
 def Cbase2Matrix4(b):
-    x = b.xAxis
-    z = b.zAxis
-    y = b.yAxis
-    return Matrix([(x.x(),      x.y(),      x.z(),      b.origin.x()),
-                   (y.x(),      y.y(),      y.z(),       b.origin.y()),
-                   (z.x(),      z.y(),      z.z(),       b.origin.z()),
+    x = b.x
+    z = b.z
+    y = b.y
+    return Matrix([(x.x,      x.y,      x.z,      b.origin.x),
+                   (y.x,      y.y,      y.z,       b.origin.y),
+                   (z.x,      z.y,      z.z,       b.origin.z),
                    (0.0,        0.0,        0.0,        1.0)])
 
 def Cbase2Matrix3(b):
-    x = b.xAxis
-    z = b.zAxis
-    y = b.yAxis
-    return Matrix([(x.x(),      x.y(),      x.z()),
-                   (y.x(),      y.y(),      y.z()),
-                   (z.x(),      z.y(),      z.z())])
+    x = b.x
+    z = b.z
+    y = b.y
+    return Matrix([(x.x,      x.y,      x.z),
+                   (y.x,      y.y,      y.z),
+                   (z.x,      z.y,      z.z)])
 
 def Cvector2Vector(v):
-    return Vector((v.x(), -1.0 * v.z(), v.y()))
+    return Vector((v.x, -1.0 * v.z, v.y))
 
 @MaxwellRenderAddon.addon_register_class
 class ImportMXS(bpy.types.Operator, ImportHelper):
@@ -121,7 +122,10 @@ class SceneImporter():
     def write_mesh(self, obj):
       materials = self.materials
       n = 0
-      if(obj.getNumTriangles() > 0 or obj.getNumVertexes() > 0):
+      #print("Null: {}".format(obj.isNull()) )
+      #print("Mesh: {}".format(obj.isMesh()) )
+      if (not obj.isNull()) and obj.isMesh() and (obj.getNumTriangles() > 0 and obj.getNumVertexes() > 0):
+        print("importing mesh")
         try:
             name = obj.getName()
         except UnicodeDecodeError:
@@ -145,6 +149,8 @@ class SceneImporter():
         max_vertex = 0
         max_normal = 0
         group_max = 0
+        print(triangles)
+        print(name)
         for i in range(triangles):
             triangle = obj.getTriangle(i)
             (v1, v2, v3, n1, n2, n3) = triangle
@@ -167,10 +173,10 @@ class SceneImporter():
               uvs.append(( u1, -1.0 * v1, u2, -1.0 * v2, u3, -1.0 * v3, 0.0, 0.0 ))
         for i in range(max_vertex + 1):
             vert = obj.getVertex(i, 0)
-            verts.append((vert.x(), vert.z(), vert.y()))
+            verts.append((vert.x, vert.z, vert.y))
         for i in range(max_vertex + 1):
             n = obj.getNormal(vert_norm[i],0)
-            normals.append((n.x(), n.z(), n.y()))
+            normals.append((n.x, n.z, n.y))
 
         me = bpy.data.meshes.new(name)
         me.vertices.add(len(verts))
@@ -178,7 +184,8 @@ class SceneImporter():
         if len(mats) >= 1:
             mats_sorted = OrderedDict(sorted(mats.items(), key=lambda x: x[1]))
             for k in mats_sorted.keys():
-                me.materials.append(materials[k])
+                print(k, self.materials)
+                me.materials.append(self.materials[k])
     #            print("setting {}".format(mat_name, k ))
         else:
             MaxwellLog("WARNING OBJECT {} HAS NO MATERIAL".format(obj.getName()))
@@ -218,45 +225,51 @@ class SceneImporter():
 
     def write_materials(self):
         self.materials = {}
-        mat_it = CmaxwellMaterialIterator()
-        mat = mat_it.first(self.mxs_scene)
-        while mat.isNull() == False:
-            #MaxwellLog("Material: %s" % mat.getName())
-            bmat = bpy.data.materials.new(mat.getName())
-            r, g, b = 0.0, 0.0, 0.0
-            textures = {}
-            if mat.getNumLayers() > 0:
-                layer = mat.getLayer(0)
-                if layer.getNumBSDFs() > 0:
-                    bsdf = layer.getBSDF(0)
-                    refl = bsdf.getReflectance()
-                    color = refl.getColor('color')
-                    r, g, b = color.rgb.r(), color.rgb.g(), color.rgb.b()
-                    tex_path = color.pFileName
-                    if tex_path and not tex_path == 'no file':
-                        MaxwellLog("LOADING: ", tex_path)
-                        i = load_image(tex_path.replace("\\","/"), self.basepath)
-                        if i:
-                            textures[tex_path] = i
-                            #bpy.data.images.append(i)
-                            #MaxwellLog(r,g,b)
-            bmat.diffuse_color = (r, g, b)
-            if len(textures) > 0:
-                MaxwellLog(textures)
-                bmat.use_nodes = True
-                n = bmat.node_tree.nodes.new('TEX_IMAGE')
-                n.image = textures[tex_path]
-                bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
-            self.materials[mat.getName()] = bmat
-            mat = mat_it.next()
+        MaxwellLog("write_materials : iter")
+        for mat in self.mxs_scene.getMaterialsIterator():
+            if mat.isNull():
+                continue
+                MaxwellLog("write_materials : continue")
+            MaxwellLog("Material")
+            mat_name = mat.getName()
+            if mat_name in self.context.blend_data.materials:
+                self.materials[mat_name] = self.context.blend_data.materials[mat_name]
+            else:
+                bmat = bpy.data.materials.new(mat.getName())
+                r, g, b = 0.0, 0.0, 0.0
+                textures = {}
+                if mat.getNumLayers() > 0:
+                    layer = mat.getLayer(0)
+                    if layer.getNumBSDFs() > 0:
+                        bsdf = layer.getBSDF(0)
+                        refl = bsdf.getReflectance()
+                        color = refl.getColor('color')
+                        r, g, b = color.rgb.r(), color.rgb.g(), color.rgb.b()
+                        tex_path = color.pFileName
+                        if tex_path and not tex_path == 'no file':
+                            MaxwellLog("LOADING: ", tex_path)
+                            i = load_image(tex_path.replace("\\","/"), self.basepath)
+                            if i:
+                                textures[tex_path] = i
+                                #bpy.data.images.append(i)
+                                #MaxwellLog(r,g,b)
+                bmat.diffuse_color = (r, g, b)
+                if len(textures) > 0:
+                    MaxwellLog(textures)
+                    bmat.use_nodes = True
+                    n = bmat.node_tree.nodes.new('TEX_IMAGE')
+                    n.image = textures[tex_path]
+                    bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
+                self.materials[mat_name] = bmat
 
     def write_instances(self):
         instances = {}
         t1 = time.time()
-        it = CmaxwellObjectIterator()
-        obj = it.first(self.mxs_scene)
+        #it = CmaxwellObjectIterator()
+        #obj = it.first(self.mxs_scene)
         instance_count = 0
-        while obj.isNull() == False:
+        #while obj.isNull() == False:
+        for obj in self.mxs_scene.getObjectIterator():
             if(obj.isInstance() == 1):
                 (base, pivot) = obj.getBaseAndPivot()
                 instance_count += 1
@@ -273,13 +286,13 @@ class SceneImporter():
                     instances[key].append(matrix)
                 else:
                     instances[key] = [matrix]
-            obj = it.next()
+            #obj = it.next()
         MaxwellLog("instances {}, object,color instanced {}".format(instance_count,len(instances)))
 
         imported_count = 0
         for k, v in instances.items():
             parent_name, mat = k
-            max_instances = 5
+            max_instances = 50
             if not parent_name in self.ob_dict:
                 continue
             if len(v) < max_instances:
@@ -293,8 +306,11 @@ class SceneImporter():
                         if len(ob.data.vertices) > 5000:
                             ob.draw_type = 'BOUNDS'
                         if not mat == 'None':
-                            ob.material_slots[0].link = 'OBJECT'
-                            ob.material_slots[0].material = self.materials[mat]
+                            try:
+                                ob.material_slots[0].link = 'OBJECT'
+                                ob.material_slots[0].material = self.materials[mat]
+                            except IndexError as e:
+                                pass
                         self.context.scene.objects.link(ob)
                         imported_count += 1
                     except KeyError as e:
@@ -351,14 +367,11 @@ class SceneImporter():
 
     def write_objects(self):
         t1 = time.time()
-        it = CmaxwellObjectIterator()
-        obj = it.first(self.mxs_scene)
         self.ob_dict = {}
-        while obj.isNull() == False:
-            if obj.isMesh() == 1:
+        for obj in self.mxs_scene.getObjectIterator():
+            if (not obj.isNull()) and obj.isMesh():
                 name, ob = self.write_mesh(obj)
                 self.ob_dict[name] = ob
-            obj = it.next()
         t2 = time.time()
         MaxwellLog('imported %d objects in %.4f sec' % (len(self.ob_dict), (t2 - t1)))
 
@@ -370,30 +383,29 @@ class SceneImporter():
         MaxwellLog('importing mxs %r' % self.filepath)
 
         time_main = time.time()
-        mxs_scene = Cmaxwell(mwcallback)
+        mxs_scene = maxwell.maxwell()
 
-        ok = mxs_scene.readMXS(self.filepath)
-        if ok == 0:
+        try:
+            mxs_scene.readMXS(self.filepath)
+        except Exception as e:
             MaxwellLog('Error reading input file: %s' % (self.filepath))
-            MaxwellLog(mxs_scene.getLastErrorString())
+            MaxwellLog(e)
         self.mxs_scene = mxs_scene
 
         time_new = time.time()
         MaxwellLog('Done parsing mxs %r in %.4f sec.' % (self.filepath, (time_new - time_main)))
 
-        for cam_name in mxs_scene.getCameraNames():
-          self.write_camera(mxs_scene.getCamera(cam_name))
+        for cam in mxs_scene.getCamerasIterator():
+          self.write_camera(cam)
         context.scene.camera = bpy.data.objects[mxs_scene.getActiveCamera().getName()]
 
         # READ MATERIALS
         self.write_materials()
-
         self.write_objects()
-
         self.write_instances()
 
 
-        MaxwellLog(mxs_scene.getSceneInfo()," Triangle groups: ",mxs_scene.getTriangleGroupsCount())
+        MaxwellLog(mxs_scene.getSceneInfo()," Triangle groups: ") #,mxs_scene.getTriangleGroupsCount())
 
         t2 = time.time()
         MaxwellLog('finished importing: %r in %.4f sec.' %

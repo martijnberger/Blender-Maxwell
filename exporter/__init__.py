@@ -7,7 +7,7 @@ from bpy_extras.io_utils import ExportHelper
 from ..outputs import MaxwellLog
 from bpy.props import StringProperty
 
-from ..pymaxwell import *
+#from ..pymaxwell import *
 from .. import MaxwellRenderAddon
 
 @MaxwellRenderAddon.addon_register_class
@@ -76,7 +76,7 @@ def save(operator, context, filepath=""):
     mxs_scene.setInputDataType('YZXRH')
 
     for o in context.scene.objects:
-        if(o.type == 'MESH' and o.is_visible(context.scene)):
+        if(o.type == 'MESH' and o.is_visible(context.scene) and not o.is_duplicator):
             me = o.to_mesh(context.scene, True, 'RENDER')
             export_mesh(o, me, mxs_scene)
         elif(o.type == 'CAMERA' and o.is_visible(context.scene)):
@@ -146,7 +146,7 @@ def export_mesh(object, me, mxs_scene):
     mesh_cache_key = object.data
 
     if mesh_cache_key in object_cache:
-        MaxwellLog("Could have instanced {}".format(mesh_cache_key))
+        MaxwellLog("Instancing {}".format(mesh_cache_key))
         orig_mxs_object, i = object_cache[mesh_cache_key]
         i += 1
         name = object.name + str(i)
@@ -170,18 +170,24 @@ def export_mesh(object, me, mxs_scene):
             if(len(face.vertices) == 4):
                 faces.append((face.vertices[2],face.vertices[3],face.vertices[0]))
 
+        MaxwellLog(object)
+        MaxwellLog(object.name)
         #create actual maxwell object
         mxs_object = mxs_scene.createMesh(object.name, len(verts), len(normals),len(faces),1)
 
-        #dump in stuff into the object
-        for i, v in verts.items():
-            mxs_object.setVertex(i, 0, v)
+        MaxwellLog(mxs_object)
+        if mxs_object != None:
+            #dump in stuff into the object
+            for i, v in verts.items():
+                mxs_object.setVertex(i, 0, v)
 
-        for i, n in normals.items():
-            mxs_object.setNormal(i, 0, n)
+            for i, n in normals.items():
+                mxs_object.setNormal(i, 0, n)
 
-        for i, f in enumerate(faces):
-            mxs_object.setTriangle(i, f[0], f[1], f[2], f[0], f[1], f[2])
+            for i, f in enumerate(faces):
+                mxs_object.setTriangle(i, f[0], f[1], f[2], f[0], f[1], f[2])
+        else:
+            MaxwellLog('could not create {}'.format(object.name))
 
     base, pivot = Matrix2CbaseNPivot(object.matrix_world)
     mxs_object.setBaseAndPivot(base,pivot)

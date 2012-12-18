@@ -17,8 +17,8 @@
 bl_info = {
     "name": "NextLimit Maxwell importer/exporter",
     "author": "Martijn Berger",
-    "version": (0, 0, 2, 'dev'),
-    "blender": (2, 6, 4),
+    "version": (0, 0, 3, 'dev'),
+    "blender": (2, 6, 3),
     "description": "Render scenes with Maxwell render and import/export MXS",
     "warning": "Very early preview",
     "wiki_url": "http://www.nextlimit.com",
