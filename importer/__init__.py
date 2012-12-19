@@ -125,7 +125,6 @@ class SceneImporter():
       #print("Null: {}".format(obj.isNull()) )
       #print("Mesh: {}".format(obj.isMesh()) )
       if (not obj.isNull()) and obj.isMesh() and (obj.getNumTriangles() > 0 and obj.getNumVertexes() > 0):
-        print("importing mesh")
         try:
             name = obj.getName()
         except UnicodeDecodeError:
@@ -149,8 +148,6 @@ class SceneImporter():
         max_vertex = 0
         max_normal = 0
         group_max = 0
-        print(triangles)
-        print(name)
         for i in range(triangles):
             triangle = obj.getTriangle(i)
             (v1, v2, v3, n1, n2, n3) = triangle
@@ -184,7 +181,6 @@ class SceneImporter():
         if len(mats) >= 1:
             mats_sorted = OrderedDict(sorted(mats.items(), key=lambda x: x[1]))
             for k in mats_sorted.keys():
-                print(k, self.materials)
                 me.materials.append(self.materials[k])
     #            print("setting {}".format(mat_name, k ))
         else:
@@ -236,23 +232,26 @@ class SceneImporter():
                 self.materials[mat_name] = self.context.blend_data.materials[mat_name]
             else:
                 bmat = bpy.data.materials.new(mat.getName())
-                r, g, b = 0.0, 0.0, 0.0
+                r, g, b = 0.7, 0.7, 0.7
                 textures = {}
                 if mat.getNumLayers() > 0:
-                    layer = mat.getLayer(0)
-                    if layer.getNumBSDFs() > 0:
-                        bsdf = layer.getBSDF(0)
-                        refl = bsdf.getReflectance()
-                        color = refl.getColor('color')
-                        r, g, b = color.rgb.r(), color.rgb.g(), color.rgb.b()
-                        tex_path = color.pFileName
-                        if tex_path and not tex_path == 'no file':
-                            MaxwellLog("LOADING: ", tex_path)
-                            i = load_image(tex_path.replace("\\","/"), self.basepath)
-                            if i:
-                                textures[tex_path] = i
-                                #bpy.data.images.append(i)
-                                #MaxwellLog(r,g,b)
+                    try:
+                        layer = mat.getLayer(0)
+                        if layer.getNumBSDFs() > 0:
+                            bsdf = layer.getBSDF(0)
+                            refl = bsdf.getReflectance()
+                            color = refl.getColor('color')
+                            r, g, b = color.rgb.r(), color.rgb.g(), color.rgb.b()
+                            tex_path = color.pFileName
+                            if tex_path and not tex_path == 'no file':
+                                MaxwellLog("LOADING: ", tex_path)
+                                i = load_image(tex_path.replace("\\","/"), self.basepath)
+                                if i:
+                                    textures[tex_path] = i
+                                    #bpy.data.images.append(i)
+                                    #MaxwellLog(r,g,b)
+                    except Exception as e:
+                        MaxwellLog(e)
                 bmat.diffuse_color = (r, g, b)
                 if len(textures) > 0:
                     MaxwellLog(textures)
