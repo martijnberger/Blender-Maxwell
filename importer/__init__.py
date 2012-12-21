@@ -226,7 +226,6 @@ class SceneImporter():
             if mat.isNull():
                 continue
                 MaxwellLog("write_materials : continue")
-            MaxwellLog("Material")
             mat_name = mat.getName()
             if mat_name in self.context.blend_data.materials:
                 self.materials[mat_name] = self.context.blend_data.materials[mat_name]
@@ -234,24 +233,23 @@ class SceneImporter():
                 bmat = bpy.data.materials.new(mat.getName())
                 r, g, b = 0.7, 0.7, 0.7
                 textures = {}
+                MaxwellLog("Laoding Material: {}".format(mat_name))
                 if mat.getNumLayers() > 0:
-                    try:
-                        layer = mat.getLayer(0)
-                        if layer.getNumBSDFs() > 0:
-                            bsdf = layer.getBSDF(0)
-                            refl = bsdf.getReflectance()
-                            color = refl.getColor('color')
-                            r, g, b = color.rgb.r(), color.rgb.g(), color.rgb.b()
-                            tex_path = color.pFileName
-                            if tex_path and not tex_path == 'no file':
-                                MaxwellLog("LOADING: ", tex_path)
-                                i = load_image(tex_path.replace("\\","/"), self.basepath)
-                                if i:
-                                    textures[tex_path] = i
-                                    #bpy.data.images.append(i)
-                                    #MaxwellLog(r,g,b)
-                    except Exception as e:
-                        MaxwellLog(e)
+                    layer = mat.getLayer(0)
+                    if layer.getNumBSDFs() > 0:
+                        bsdf = layer.getBSDF(0)
+                        refl = bsdf.getReflectance()
+                        color = refl.getColor('color')
+                        r, g, b = color.rgb.r, color.rgb.g, color.rgb.b
+                        tex_path = color.pFileName
+                        if tex_path:
+                            tex = str(tex_path,'UTF-8').replace("\\","/")
+                            MaxwellLog("LOADING: {}".format(tex))
+                            i = load_image(tex, self.basepath)
+                            if i:
+                                textures[tex] = i
+                                bpy.data.images.load()
+                                #MaxwellLog(r,g,b)
                 bmat.diffuse_color = (r, g, b)
                 if len(textures) > 0:
                     MaxwellLog(textures)
