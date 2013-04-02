@@ -20,7 +20,10 @@ pi = math.pi
 def CbasePivot2Matrix(b,p):
     '''Calculate a transformation matrix based on a MXS base and pivot
        FIXME this breaks if pivot.origin != 0 '''
+    #MaxwellLog("\nb: {}  \n->\n {}".format(b,Cbase2Matrix3(b)))
+    #MaxwellLog("\np: {}  \n->\n {}".format(p,Cbase2Matrix3(p)))
     m = Cbase2Matrix3(b) * Cbase2Matrix3(p)
+    #MaxwellLog("m: {}".format(m))
     x = m[0]
     y = m[1]
     z = m[2]
@@ -90,20 +93,22 @@ class SceneImporter():
 
 
     def write_camera(self, camera):
+      MaxwellLog("Camera: {}".format(camera.getName()))
       origin, focalPoint, up, focalLength, fStop, stepTime = camera.getStep(0)
       camValues = camera.getValues()
-      MaxwellLog(camera.getName())
-      dir_vect = Cvector2Vector(origin) - Cvector2Vector(focalPoint)
-      q = dir_vect.normalized().rotation_difference((0,0,-1))
-      qe = q.to_euler()
       obj = bpy.ops.object.add(type='CAMERA',
-                         location=Cvector2Vector(origin),
-                         rotation=(qe.x, qe.y, qe.z))
+                         location=Cvector2Vector(origin))
       ob = self.context.object
-      up2 = ob.matrix_world.col[1].to_3d()
-      dir = ob.matrix_world.col[3] - ob.matrix_world.col[2]
-      rot_diff = up2.rotation_difference(Cvector2Vector(up))
-      ob.rotation_euler.rotate(rot_diff)
+
+      z = Cvector2Vector(origin) - Cvector2Vector(focalPoint)
+      z = z.normalized()
+      y = Cvector2Vector(up).normalized()
+      x = y.cross(z)
+      
+      ob.matrix_world.col[0] = x.resized(4)
+      ob.matrix_world.col[1] = y.resized(4)
+      ob.matrix_world.col[2] = z.resized(4)
+
       ob.name = camera.getName()
       cam = ob.data
       cam.lens = focalLength * 1000 # Maxwell lens is in meters
@@ -201,11 +206,16 @@ class SceneImporter():
         me.validate()
 
         ob = bpy.data.objects.new(name, me)
+        MaxwellLog(base, pivot)
         ob.matrix_basis = CbasePivot2Matrix(base,pivot)
         if len(verts) > 5000:
             ob.draw_type = 'BOUNDS'
 
-        inv_matrix = ob.matrix_basis.inverted()
+        try:
+            inv_matrix = ob.matrix_basis.inverted()
+        except ValueError as e:
+            MaxwellLog("Cannot invert {}".format(ob.matrix_basis))
+            inv_matrix = Matrix.Identity(4)
         self.context.scene.objects.link(ob)
         self.context.scene.objects.active = ob
         ob.select = True
@@ -245,18 +255,24 @@ class SceneImporter():
                         if tex_path:
                             tex = str(tex_path,'UTF-8').replace("\\","/")
                             MaxwellLog("LOADING: {}".format(tex))
-                            i = load_image(tex, self.basepath)
+                            #i = load_image(tex, self.basepath)
+                            tp = self.basepath + "/" + tex
+                            i = bpy.data.images.load(tp)
                             if i:
                                 textures[tex] = i
-                                bpy.data.images.load()
-                                #MaxwellLog(r,g,b)
+                                #bpy.data.images.load()
+                                #MaxwellLog(r,g,b)'''
                 bmat.diffuse_color = (r, g, b)
                 if len(textures) > 0:
                     MaxwellLog(textures)
                     bmat.use_nodes = True
-                    n = bmat.node_tree.nodes.new('TEX_IMAGE')
-                    n.image = textures[tex_path]
-                    bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
+                    n = bmat.node_tree.nodes.new('ShaderNodeTexImage')
+                    n.image = textures[tex]
+                    try:
+                        bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
+                    except KeyError as e:
+                        print(e)
+                        pass
                 self.materials[mat_name] = bmat
 
     def write_instances(self):
