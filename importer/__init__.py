@@ -2,6 +2,7 @@ import bpy
 import os
 import time
 import math
+import re
 
 from mathutils import Matrix, Vector
 from bpy_extras.io_utils import unpack_list, unpack_face_list
@@ -21,22 +22,43 @@ def CbasePivot2Matrix(b,p):
     '''Calculate a transformation matrix based on a MXS base and pivot
        FIXME this breaks if pivot.origin != 0 '''
     m = Cbase2Matrix3(b) * Cbase2Matrix3(p)
+
+    m2 = AxisMatrix* Cbase2Matrix4(b) * Cbase2Matrix4(p)
+
+
     x = m[0]
     y = m[1]
     z = m[2]
-    return Matrix([(x.x,      z.x,      y.x,      b.origin.x),
+    m3 =  Matrix([(x.x,      z.x,      y.x,      b.origin.x),
                    (-1 * x.z, -1 * z.z, -1 * y.z, -1 * b.origin.z),
                    (x.y,      z.y,      y.y,       b.origin.y),
                    (0.0,        0.0,        0.0,        1.0)])
 
-def Cbase2Matrix4(b):
-    x = b.x
-    z = b.z
-    y = b.y
-    return Matrix([(x.x,      x.y,      x.z,      b.origin.x),
-                   (y.x,      y.y,      y.z,       b.origin.y),
-                   (z.x,      z.y,      z.z,       b.origin.z),
-                   (0.0,        0.0,        0.0,        1.0)])
+    print("\nm2: {}\n\nm3: {}\n".format(m2,m3))
+    return m2
+
+
+AxisMatrixI = Matrix(((1,  0,  0, 0),
+                     (0,  0,  1, 0),
+                     (0, -1,  0, 0),
+                     (0,  0,  0, 1))) # mathutils.Matrix().Rotation( -pi /2 , 4, 'X').inverted()
+
+AxisMatrix = Matrix(((1, 0,  0, 0),
+                     (0, 0, -1, 0),
+                     (0, 1,  0, 0),
+                     (0, 0,  0, 1))) # mathutils.Matrix().Rotation( -pi /2 , 4, 'X').inverted()
+
+AxisMatrix3 = Matrix(((1, 0,  0),
+                      (0, 0, -1),
+                      (0, 1,  0)))
+
+ScaleMatrix = Matrix(((-0.0254, 0, 0),
+                      (0, -0.0254, 0),
+                      (0, 0,  0.0264)))
+ScaleMatrixI = ScaleMatrix.inverted()
+
+def MatrixScale(m):
+    return m * ScaleMatrixI.to_4x4()
 
 def Cbase2Matrix3(b):
     x = b.x
@@ -46,8 +68,18 @@ def Cbase2Matrix3(b):
                    (y.x,      y.y,      y.z),
                    (z.x,      z.y,      z.z)])
 
+def Cbase2Matrix4(b):
+    x = b.x
+    y = b.y
+    z = b.z
+    o = b.origin
+    return Matrix([(x.x,      x.y,      x.z,  o.x),
+                   (y.x,      y.y,      y.z,  o.y),
+                   (z.x,      z.y,      z.z,  o.z),
+                   (0,          0,        0,   1)])
+
 def Cvector2Vector(v):
-    return Vector((v.x, -1.0 * v.z, v.y))
+    return AxisMatrix3 * Vector((v.x, v.y, v.z))
 
 @MaxwellRenderAddon.addon_register_class
 class ImportMXS(bpy.types.Operator, ImportHelper):
@@ -154,6 +186,9 @@ class SceneImporter():
 
     def write_mesh(self, obj):
       materials = self.materials
+
+      proxy_names = ['conveyor_band5000', 'conveyor_inschiet1', 'conveyor_inschiet_haaks']
+      proxy_group = False
       n = 0
       if (not obj.isNull()) and obj.isMesh() and (obj.getNumTriangles() > 0 and obj.getNumVertexes() > 0):
         try:
@@ -161,81 +196,109 @@ class SceneImporter():
         except UnicodeDecodeError:
             obj.setName('corrupt' + str(n))
             name = 'corrupt' + str(n)
-        (base, pivot) = obj.getBaseAndPivot()
-        triangles = obj.getNumTriangles()
-        vertices = obj.getNumVertexes()
-        normal_count = obj.getNumNormals()
-        positions = obj.getNumPositionsPerVertex()
-        uv_layer_count = obj.getNumChannelsUVW()
-        verts = []
-        faces = []
-        normals = []
-        vert_norm = {}
-        mats = {}
-        mat_index = []
-        uvs = []
-        i = 0
-        num = triangles
-        max_vertex = 0
-        max_normal = 0
-        group_max = 0
-        for i in range(triangles):
-            triangle = obj.getTriangle(i)
-            (v1, v2, v3, n1, n2, n3) = triangle
-            max_vertex = max(max_vertex, v1, v2, v3)
-            max_normal = max(max_normal, n1, n2, n3)
-            mat = obj.getTriangleMaterial(i)
-            if not mat.isNull():
-              mat_name = mat.getName()
-              if not mat_name in mats:
-                mats[mat_name] = len(mats)
-              mat_index.append(mats[mat_name])
+        if 'proxy' in name:
+            bettername = re.match('\<(.*)\>', name).group(1)
+            if '#' in bettername:
+                bettername = re.match('(.*)#', bettername).group(1)
+            bettername = bettername[:-6]
+            if bettername in bpy.data.groups.keys():
+                MaxwellLog("FOUND {} GROUP".format(bettername))
+                proxy_group = True
             else:
-              mat_index.append(0)
-            faces.append((v1, v2, v3))
-            vert_norm[v1] = n1
-            vert_norm[v2] = n2
-            vert_norm[v3] = n3
-            if uv_layer_count > 0:
-              u1, v1, w1, u2, v2, w2, u3, v3, w3 = obj.getTriangleUVW(i, 0)
-              uvs.append(( u1, -1.0 * v1, u2, -1.0 * v2, u3, -1.0 * v3, 0.0, 0.0 ))
-        for i in range(max_vertex + 1):
-            vert = obj.getVertex(i, 0)
-            verts.append((vert.x, vert.z, vert.y))
-        for i in range(max_vertex + 1):
-            n = obj.getNormal(vert_norm[i],0)
-            normals.append((n.x, n.z, n.y))
+                MaxwellLog("COULD NOT FIND GROUP FOR {}".format(bettername))
+        (base, pivot) = obj.getBaseAndPivot()
+        MaxwellLog(name)
+        MaxwellLog(base)
+        MaxwellLog(pivot)
+        MaxwellLog(CbasePivot2Matrix(base,pivot))
 
-        me = bpy.data.meshes.new(name)
-        me.vertices.add(len(verts))
-        me.tessfaces.add(len(faces))
-        if len(mats) >= 1:
-            mats_sorted = OrderedDict(sorted(mats.items(), key=lambda x: x[1]))
-            for k in mats_sorted.keys():
-                me.materials.append(self.materials[k])
-    #            print("setting {}".format(mat_name, k ))
+        if not proxy_group:
+            triangles = obj.getNumTriangles()
+            vertices = obj.getNumVertexes()
+            normal_count = obj.getNumNormals()
+            positions = obj.getNumPositionsPerVertex()
+            uv_layer_count = obj.getNumChannelsUVW()
+            verts = []
+            faces = []
+            normals = []
+            vert_norm = {}
+            mats = {}
+            mat_index = []
+            uvs = []
+            i = 0
+            num = triangles
+            max_vertex = 0
+            max_normal = 0
+            group_max = 0
+            for i in range(triangles):
+                triangle = obj.getTriangle(i)
+                (v1, v2, v3, n1, n2, n3) = triangle
+                max_vertex = max(max_vertex, v1, v2, v3)
+                max_normal = max(max_normal, n1, n2, n3)
+                mat = obj.getTriangleMaterial(i)
+                if not mat.isNull():
+                  mat_name = mat.getName()
+                  if not mat_name in mats:
+                    mats[mat_name] = len(mats)
+                  mat_index.append(mats[mat_name])
+                else:
+                  mat_index.append(0)
+                faces.append((v1, v2, v3))
+                vert_norm[v1] = n1
+                vert_norm[v2] = n2
+                vert_norm[v3] = n3
+                if uv_layer_count > 0:
+                  u1, v1, w1, u2, v2, w2, u3, v3, w3 = obj.getTriangleUVW(i, 0)
+                  uvs.append(( u1, -1.0 * v1, u2, -1.0 * v2, u3, -1.0 * v3, 0.0, 0.0 ))
+            for i in range(max_vertex + 1):
+                vert = obj.getVertex(i, 0)
+                verts.append((vert.x, vert.y, vert.z))
+                #verts.append((vert.x, vert.z, vert.y))
+            for i in range(max_vertex + 1):
+                n = obj.getNormal(vert_norm[i],0)
+                #normals.append((n.x, n.z, n.y))
+                normals.append((n.x, n.y, n.z))
+
+            me = bpy.data.meshes.new(name)
+            me.vertices.add(len(verts))
+            me.tessfaces.add(len(faces))
+            if len(mats) >= 1:
+                mats_sorted = OrderedDict(sorted(mats.items(), key=lambda x: x[1]))
+                for k in mats_sorted.keys():
+                    me.materials.append(self.materials[k])
+        #            print("setting {}".format(mat_name, k ))
+            else:
+                MaxwellLog("WARNING OBJECT {} HAS NO MATERIAL".format(obj.getName()))
+
+            #print("{} verts: {}\tfaces: {}\tnormals: {}".format(name, len(verts), len(faces), len(normals)))
+
+            me.vertices.foreach_set("co", unpack_list(verts))
+            me.vertices.foreach_set("normal",  unpack_list(normals))
+            me.tessfaces.foreach_set("vertices_raw", unpack_face_list(faces))
+            me.tessfaces.foreach_set("material_index", mat_index)
+            if len(uvs) > 0:
+                me.tessface_uv_textures.new()
+                for i in range(len(uvs)):
+                    me.tessface_uv_textures[0].data[i].uv_raw = uvs[i]
+
+            me.update(calc_edges=True)    # Update mesh with new data
+            me.validate()
+
+            ob = bpy.data.objects.new(name, me)
+            if len(verts) > 5000:
+                ob.draw_type = 'BOUNDS'
+            me.update(calc_edges=True)
         else:
-            MaxwellLog("WARNING OBJECT {} HAS NO MATERIAL".format(obj.getName()))
+            ob = bpy.data.objects.new(bettername, None)
+            ob.dupli_type = 'GROUP'
+            ob.dupli_group = bpy.data.groups[bettername]
 
-        #print("{} verts: {}\tfaces: {}\tnormals: {}".format(name, len(verts), len(faces), len(normals)))
 
-        me.vertices.foreach_set("co", unpack_list(verts))
-        me.vertices.foreach_set("normal",  unpack_list(normals))
-        me.tessfaces.foreach_set("vertices_raw", unpack_face_list(faces))
-        me.tessfaces.foreach_set("material_index", mat_index)
-        if len(uvs) > 0:
-            me.tessface_uv_textures.new()
-            for i in range(len(uvs)):
-                me.tessface_uv_textures[0].data[i].uv_raw = uvs[i]
-
-        me.update(calc_edges=True)    # Update mesh with new data
-        me.validate()
-
-        ob = bpy.data.objects.new(name, me)
-        MaxwellLog(base, pivot)
-        ob.matrix_basis = CbasePivot2Matrix(base,pivot)
-        if len(verts) > 5000:
-            ob.draw_type = 'BOUNDS'
+        #MaxwellLog(base, pivot)
+        if not proxy_group:
+            ob.matrix_basis = CbasePivot2Matrix(base,pivot)
+        else:
+            ob.matrix_basis = MatrixScale(CbasePivot2Matrix(base,pivot))
 
         try:
             inv_matrix = ob.matrix_basis.inverted()
@@ -244,11 +307,14 @@ class SceneImporter():
             inv_matrix = Matrix.Identity(4)
         self.context.scene.objects.link(ob)
         self.context.scene.objects.active = ob
-        ob.select = True
-        bpy.ops.object.transform_apply(rotation=True,scale=True)
-        ob.select = False
-        me.update(calc_edges=True)
-        return (name, (ob, inv_matrix))
+
+        if not proxy_group:
+            #ob.select = True
+            #bpy.ops.object.transform_apply(rotation=True,scale=True)
+            #ob.select = False
+            inv_matrix = Matrix.Identity(4)
+
+        return (name, (ob, inv_matrix, proxy_group))
       else:
           MaxwellLog('NOT DONE:', obj.getName(), ' NULL: ', obj.isNull(), '  ', obj.getNumVertexes(), '  ', obj.getNumTriangles())
       return (False, False)
@@ -336,23 +402,29 @@ class SceneImporter():
             parent_name, mat = k
             max_instances = 50
             if not parent_name in self.ob_dict:
+                MaxwellLog('Cannot find object to instance: {}'.format(parent_name))
                 continue
             if len(v) < max_instances:
                 for w in v:
                     try:
-                        ob, inv_matrix = self.ob_dict[parent_name]
+                        ob, inv_matrix, proxy_group = self.ob_dict[parent_name]
                         ob = ob.copy()
                         ls = (w.to_3x3() * inv_matrix.to_3x3() ).to_4x4()
                         ls.col[3] = w.col[3]
-                        ob.matrix_basis = ls
-                        if len(ob.data.vertices) > 5000:
-                            ob.draw_type = 'BOUNDS'
-                        if not mat == 'None':
-                            try:
-                                ob.material_slots[0].link = 'OBJECT'
-                                ob.material_slots[0].material = self.materials[mat]
-                            except IndexError as e:
-                                pass
+                        if not proxy_group:
+                            ob.matrix_basis = ls
+                            if len(ob.data.vertices) > 5000:
+                                ob.draw_type = 'BOUNDS'
+                            if not mat == 'None':
+                                try:
+                                    ob.material_slots[0].link = 'OBJECT'
+                                    ob.material_slots[0].material = self.materials[mat]
+                                except IndexError as e:
+                                    pass
+                        else:
+                            #ob.matrix_basis = MatrixScale(ls)
+                            ob.matrix_basis = ls
+
                         self.context.scene.objects.link(ob)
                         imported_count += 1
                     except KeyError as e:
@@ -386,16 +458,20 @@ class SceneImporter():
                     dob.matrix_basis = dmatrix
 
                     w = Matrix([(trans[0], trans[1], trans[2]), (trans[3], trans[4], trans[5]), (trans[6], trans[7], trans[8])])
-                    ob, inv_matrix = self.ob_dict[parent_name]
+                    ob, inv_matrix, proxy_group = self.ob_dict[parent_name]
                     ob = ob.copy()
                     ls = (w * inv_matrix.to_3x3() ).to_4x4()
                     ls.col[3] = verts[0][0],verts[0][1],verts[0][2],1
-                    ob.matrix_basis = ls
-                    if len(ob.data.vertices) > 5000:
-                        ob.draw_type = 'BOUNDS'
-                    if not mat == 'None':
-                        ob.material_slots[0].link = 'OBJECT'
-                        ob.material_slots[0].material = self.materials[mat]
+                    if not proxy_group:
+                        ob.matrix_basis = ls
+                        if len(ob.data.vertices) > 5000:
+                            ob.draw_type = 'BOUNDS'
+                        if not mat == 'None':
+                            ob.material_slots[0].link = 'OBJECT'
+                            ob.material_slots[0].material = self.materials[mat]
+                    else:
+                        ob.matrix_basis = ls
+                        #ob.matrix_basis = MatrixScale(ls)
 
                     ob.parent=dob
                     self.context.scene.objects.link(dob)
@@ -448,7 +524,7 @@ class SceneImporter():
 
         if options['import_meshes']:
             self.write_objects()
-            self.write_instances()
+            #self.write_instances()
 
 
         #MaxwellLog(mxs_scene.getSceneInfo()," Triangle groups: ") #,mxs_scene.getTriangleGroupsCount())
