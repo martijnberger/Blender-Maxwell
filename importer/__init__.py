@@ -7,7 +7,7 @@ from mathutils import Matrix, Vector
 from bpy_extras.io_utils import unpack_list, unpack_face_list
 from bpy_extras.image_utils import load_image
 from bpy_extras.io_utils import ImportHelper
-from bpy.props import StringProperty
+from bpy.props import StringProperty, BoolProperty
 from collections import OrderedDict
 from .. import MaxwellRenderAddon
 
@@ -20,10 +20,7 @@ pi = math.pi
 def CbasePivot2Matrix(b,p):
     '''Calculate a transformation matrix based on a MXS base and pivot
        FIXME this breaks if pivot.origin != 0 '''
-    #MaxwellLog("\nb: {}  \n->\n {}".format(b,Cbase2Matrix3(b)))
-    #MaxwellLog("\np: {}  \n->\n {}".format(p,Cbase2Matrix3(p)))
     m = Cbase2Matrix3(b) * Cbase2Matrix3(p)
-    #MaxwellLog("m: {}".format(m))
     x = m[0]
     y = m[1]
     z = m[2]
@@ -66,16 +63,47 @@ class ImportMXS(bpy.types.Operator, ImportHelper):
         options={'HIDDEN'},
     )
 
+    import_camera = BoolProperty(
+        name="Cameras",
+        description="Import camera's",
+        default=True,
+    )
+
+    import_material = BoolProperty(
+        name="Materials",
+        description="Import materials's",
+        default=True,
+    )
+
+    import_meshes = BoolProperty(
+        name="Meshes",
+        description="Import meshes's",
+        default=True,
+    )
+
+    handle_proxy_group = BoolProperty(
+        name="Proxy",
+        description="Attempt to find groups for meshes names *_proxy*",
+        default=True,
+    )
+
     def execute(self, context):
         keywords = self.as_keywords(ignore=("axis_forward",
                                             "axis_up",
                                             "filter_glob",
                                             "split_mode",
             ))
-        return SceneImporter().set_filename(keywords['filepath']).load(context)
+        return SceneImporter().set_filename(keywords['filepath']).load(context, **keywords)
 
     def draw(self, context):
         layout = self.layout
+
+        row = layout.row(align=True)
+        row.prop(self, "import_camera")
+        row.prop(self, "import_material")
+        row = layout.row(align=True)
+        row.prop(self, "import_meshes")
+        row.prop(self, "handle_proxy_group")
 
 menu_func = lambda self, context: self.layout.operator(ImportMXS.bl_idname, text="Import Maxwell Scene(.mxs)")
 bpy.types.INFO_MT_file_import.append(menu_func)
@@ -93,7 +121,7 @@ class SceneImporter():
 
 
     def write_camera(self, camera):
-      MaxwellLog("Camera: {}".format(camera.getName()))
+      #MaxwellLog("Camera: {}".format(camera.getName()))
       origin, focalPoint, up, focalLength, fStop, stepTime = camera.getStep(0)
       camValues = camera.getValues()
       obj = bpy.ops.object.add(type='CAMERA',
@@ -127,8 +155,6 @@ class SceneImporter():
     def write_mesh(self, obj):
       materials = self.materials
       n = 0
-      #print("Null: {}".format(obj.isNull()) )
-      #print("Mesh: {}".format(obj.isMesh()) )
       if (not obj.isNull()) and obj.isMesh() and (obj.getNumTriangles() > 0 and obj.getNumVertexes() > 0):
         try:
             name = obj.getName()
@@ -257,7 +283,10 @@ class SceneImporter():
                             MaxwellLog("LOADING: {}".format(tex))
                             #i = load_image(tex, self.basepath)
                             tp = self.basepath + "/" + tex
-                            i = bpy.data.images.load(tp)
+                            try:
+                                i = bpy.data.images.load(tp)
+                            except RuntimeError as e:
+                                i = None
                             if i:
                                 textures[tex] = i
                                 #bpy.data.images.load()
@@ -389,7 +418,7 @@ class SceneImporter():
         MaxwellLog('imported %d objects in %.4f sec' % (len(self.ob_dict), (t2 - t1)))
 
 
-    def load(self, context):
+    def load(self, context, **options):
         '''load a maxwell file'''
         self.context = context
 
@@ -408,17 +437,21 @@ class SceneImporter():
         time_new = time.time()
         MaxwellLog('Done parsing mxs %r in %.4f sec.' % (self.filepath, (time_new - time_main)))
 
-        for cam in mxs_scene.getCamerasIterator():
-          self.write_camera(cam)
-        context.scene.camera = bpy.data.objects[mxs_scene.getActiveCamera().getName()]
+        if options['import_camera']:
+            for cam in mxs_scene.getCamerasIterator():
+                self.write_camera(cam)
+            context.scene.camera = bpy.data.objects[mxs_scene.getActiveCamera().getName()]
 
-        # READ MATERIALS
-        self.write_materials()
-        self.write_objects()
-        self.write_instances()
+        if options['import_material']:
+            # READ MATERIALS
+            self.write_materials()
+
+        if options['import_meshes']:
+            self.write_objects()
+            self.write_instances()
 
 
-        MaxwellLog(mxs_scene.getSceneInfo()," Triangle groups: ") #,mxs_scene.getTriangleGroupsCount())
+        #MaxwellLog(mxs_scene.getSceneInfo()," Triangle groups: ") #,mxs_scene.getTriangleGroupsCount())
 
         t2 = time.time()
         MaxwellLog('finished importing: %r in %.4f sec.' %
