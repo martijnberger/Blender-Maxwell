@@ -18,47 +18,30 @@ from ..outputs import MaxwellLog
 
 pi = math.pi
 
-def CbasePivot2Matrix(b,p):
-    '''Calculate a transformation matrix based on a MXS base and pivot
-       FIXME this breaks if pivot.origin != 0 '''
-    m = Cbase2Matrix3(b) * Cbase2Matrix3(p)
-
-    m2 = AxisMatrix* Cbase2Matrix4(b) * Cbase2Matrix4(p)
-
-
-    x = m[0]
-    y = m[1]
-    z = m[2]
-    m3 =  Matrix([(x.x,      z.x,      y.x,      b.origin.x),
-                   (-1 * x.z, -1 * z.z, -1 * y.z, -1 * b.origin.z),
-                   (x.y,      z.y,      y.y,       b.origin.y),
-                   (0.0,        0.0,        0.0,        1.0)])
-
-    print("\nm2: {}\n\nm3: {}\n".format(m2,m3))
-    return m2
-
-
-AxisMatrixI = Matrix(((1,  0,  0, 0),
-                     (0,  0,  1, 0),
-                     (0, -1,  0, 0),
-                     (0,  0,  0, 1))) # mathutils.Matrix().Rotation( -pi /2 , 4, 'X').inverted()
-
-AxisMatrix = Matrix(((1, 0,  0, 0),
-                     (0, 0, -1, 0),
-                     (0, 1,  0, 0),
-                     (0, 0,  0, 1))) # mathutils.Matrix().Rotation( -pi /2 , 4, 'X').inverted()
-
 AxisMatrix3 = Matrix(((1, 0,  0),
                       (0, 0, -1),
-                      (0, 1,  0)))
+                      (0, 1,  0))) # mathutils.Matrix().Rotation( -pi /2 , 4, 'X').inverted()
+AxisMatrix = AxisMatrix3.to_4x4()
 
-ScaleMatrix = Matrix(((-0.0254, 0, 0),
-                      (0, -0.0254, 0),
-                      (0, 0,  0.0264)))
-ScaleMatrixI = ScaleMatrix.inverted()
 
-def MatrixScale(m):
-    return m * ScaleMatrixI.to_4x4()
+
+def old_CbasePivot2Matrix(b,p):
+        """This works but it should not """
+        m = Cbase2Matrix3(b) * Cbase2Matrix3(p)
+        x = m[0]
+        y = m[1]
+        z = m[2]
+        m3 =  Matrix([(x.x,           y.x,      z.x,      b.origin.x),
+                      (-1 * x.z, -1 * y.z, -1 * z.z, -1 * b.origin.z),
+                      (x.y,           y.y,      z.y,      b.origin.y),
+                      (0.0,           0.0,      0.0,      1.0)])
+        return m3
+
+def new_CbasePivot2Matrix(b,p):
+    '''Broken for some reason)'''
+    return  AxisMatrix * Cbase2Matrix4(b) * Cbase2Matrix4(p)
+
+CbasePivot2Matrix = old_CbasePivot2Matrix
 
 def Cbase2Matrix3(b):
     x = b.x
@@ -79,7 +62,7 @@ def Cbase2Matrix4(b):
                    (0,          0,        0,   1)])
 
 def Cvector2Vector(v):
-    return AxisMatrix3 * Vector((v.x, v.y, v.z))
+    return Vector((v.x, v.y, v.z))
 
 @MaxwellRenderAddon.addon_register_class
 class ImportMXS(bpy.types.Operator, ImportHelper):
@@ -157,12 +140,12 @@ class SceneImporter():
       origin, focalPoint, up, focalLength, fStop, stepTime = camera.getStep(0)
       camValues = camera.getValues()
       obj = bpy.ops.object.add(type='CAMERA',
-                         location=Cvector2Vector(origin))
+                         location=AxisMatrix3 * Cvector2Vector(origin))
       ob = self.context.object
 
-      z = Cvector2Vector(origin) - Cvector2Vector(focalPoint)
+      z = AxisMatrix3 * Cvector2Vector(origin) - AxisMatrix3 *Cvector2Vector(focalPoint)
       z = z.normalized()
-      y = Cvector2Vector(up).normalized()
+      y = (AxisMatrix3 *Cvector2Vector(up)).normalized()
       x = y.cross(z)
       
       ob.matrix_world.col[0] = x.resized(4)
@@ -207,16 +190,17 @@ class SceneImporter():
             else:
                 MaxwellLog("COULD NOT FIND GROUP FOR {}".format(bettername))
         (base, pivot) = obj.getBaseAndPivot()
-        MaxwellLog(name)
-        MaxwellLog(base)
-        MaxwellLog(pivot)
-        MaxwellLog(CbasePivot2Matrix(base,pivot))
+        if '3600' in name:
+            MaxwellLog(name)
+            MaxwellLog("\n\nBase {} \n {}".format(Cbase2Matrix4(base),Cbase2Matrix4(base).decompose() ))
+            MaxwellLog("\n\nPivot {} \n {}".format(Cbase2Matrix4(pivot), Cbase2Matrix4(pivot).decompose()))
+            rot_ang = Cbase2Matrix4(base).decompose()[1] * Cbase2Matrix4(pivot).decompose()[1]
+            MaxwellLog("{} \n{}".format(rot_ang, (AxisMatrix.to_quaternion() * rot_ang).to_euler()))
+
+            MaxwellLog(CbasePivot2Matrix(base,pivot))
 
         if not proxy_group:
             triangles = obj.getNumTriangles()
-            vertices = obj.getNumVertexes()
-            normal_count = obj.getNumNormals()
-            positions = obj.getNumPositionsPerVertex()
             uv_layer_count = obj.getNumChannelsUVW()
             verts = []
             faces = []
@@ -225,11 +209,8 @@ class SceneImporter():
             mats = {}
             mat_index = []
             uvs = []
-            i = 0
-            num = triangles
             max_vertex = 0
             max_normal = 0
-            group_max = 0
             for i in range(triangles):
                 triangle = obj.getTriangle(i)
                 (v1, v2, v3, n1, n2, n3) = triangle
@@ -253,10 +234,8 @@ class SceneImporter():
             for i in range(max_vertex + 1):
                 vert = obj.getVertex(i, 0)
                 verts.append((vert.x, vert.y, vert.z))
-                #verts.append((vert.x, vert.z, vert.y))
             for i in range(max_vertex + 1):
                 n = obj.getNormal(vert_norm[i],0)
-                #normals.append((n.x, n.z, n.y))
                 normals.append((n.x, n.y, n.z))
 
             me = bpy.data.meshes.new(name)
@@ -269,8 +248,6 @@ class SceneImporter():
         #            print("setting {}".format(mat_name, k ))
             else:
                 MaxwellLog("WARNING OBJECT {} HAS NO MATERIAL".format(obj.getName()))
-
-            #print("{} verts: {}\tfaces: {}\tnormals: {}".format(name, len(verts), len(faces), len(normals)))
 
             me.vertices.foreach_set("co", unpack_list(verts))
             me.vertices.foreach_set("normal",  unpack_list(normals))
@@ -294,11 +271,7 @@ class SceneImporter():
             ob.dupli_group = bpy.data.groups[bettername]
 
 
-        #MaxwellLog(base, pivot)
-        if not proxy_group:
-            ob.matrix_basis = CbasePivot2Matrix(base,pivot)
-        else:
-            ob.matrix_basis = MatrixScale(CbasePivot2Matrix(base,pivot))
+        ob.matrix_world = CbasePivot2Matrix(base,pivot)
 
         try:
             inv_matrix = ob.matrix_basis.inverted()
@@ -309,10 +282,9 @@ class SceneImporter():
         self.context.scene.objects.active = ob
 
         if not proxy_group:
-            #ob.select = True
-            #bpy.ops.object.transform_apply(rotation=True,scale=True)
-            #ob.select = False
-            inv_matrix = Matrix.Identity(4)
+            ob.select = True
+            bpy.ops.object.transform_apply(rotation=True,scale=True)
+            ob.select = False
 
         return (name, (ob, inv_matrix, proxy_group))
       else:
@@ -347,7 +319,6 @@ class SceneImporter():
                         if tex_path:
                             tex = str(tex_path,'UTF-8').replace("\\","/")
                             MaxwellLog("LOADING: {}".format(tex))
-                            #i = load_image(tex, self.basepath)
                             tp = self.basepath + "/" + tex
                             try:
                                 i = bpy.data.images.load(tp)
@@ -524,10 +495,8 @@ class SceneImporter():
 
         if options['import_meshes']:
             self.write_objects()
-            #self.write_instances()
+            self.write_instances()
 
-
-        #MaxwellLog(mxs_scene.getSceneInfo()," Triangle groups: ") #,mxs_scene.getTriangleGroupsCount())
 
         t2 = time.time()
         MaxwellLog('finished importing: %r in %.4f sec.' %
