@@ -7,7 +7,7 @@ from bpy_extras.io_utils import ExportHelper
 from ..outputs import MaxwellLog
 from bpy.props import StringProperty
 
-#from ..pymaxwell import *
+from ..maxwell import maxwell
 from .. import MaxwellRenderAddon
 
 @MaxwellRenderAddon.addon_register_class
@@ -47,7 +47,7 @@ TRANSFORM_MATRIX = mathutils.Matrix().Rotation( -pi /2 , 4, 'X')  # rotate -90 d
 
 def Matrix2CbaseNPivot(m):
     m = TRANSFORM_MATRIX * m
-    base = Cbase()
+    base = maxwell.Base()
     base.origin = toCvector(m.col[3])
     base.xAxis = toCvector([1,0,0])
     base.yAxis = toCvector([0,1,0])
@@ -58,11 +58,11 @@ def Matrix2CbaseNPivot(m):
     return base, pivot
 
 def Matrix2Cbase(m):
-    return Cbase(Cvector(0,0,0), toCvector(m.col[0]), toCvector(m.col[1]),toCvector(m.col[2]))
+    return maxwell.Base(maxwell.Vector(0,0,0), toCvector(m.col[0]), toCvector(m.col[1]),toCvector(m.col[2]))
 
 def toCvector(vec):
     '''create a Cvector type from a blender mathutils.Vector'''
-    return Cvector(vec[0],vec[1],vec[2])
+    return maxwell.Vector(vec[0],vec[1],vec[2])
 
 object_cache = {}
 
@@ -71,7 +71,7 @@ def save(operator, context, filepath=""):
     MaxwellLog('exporting mxs %r' % filepath)
 
     time_main = time.time()
-    mxs_scene = Cmaxwell(mwcallback)
+    mxs_scene = maxwell.maxwell()
     mxs_scene.setPluginID("Blender Maxwell")
     mxs_scene.setInputDataType('YZXRH')
 
@@ -160,9 +160,7 @@ def export_mesh(object, me, mxs_scene):
         faces = []
         for i, vertex in enumerate(me.vertices):
             #print(i,": ", vertex.co)
-            position = Cvector()
-            position.assign(vertex.co[0],vertex.co[1],vertex.co[2])
-            verts[i] = position
+            verts[i] = maxwell.Vector(x= vertex.co[0], y= vertex.co[1], z= vertex.co[2])
             normals[i] = toCvector(Vector((vertex.normal[0],vertex.normal[1],vertex.normal[2])).normalized())
 
         for i, face in enumerate(me.tessfaces):
