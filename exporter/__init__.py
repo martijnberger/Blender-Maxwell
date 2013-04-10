@@ -3,12 +3,28 @@ import math
 import bpy
 import mathutils
 from mathutils import Matrix, Vector
-from bpy_extras.io_utils import ExportHelper
+from bpy_extras.io_utils import ExportHelper, axis_conversion
 from ..outputs import MaxwellLog
 from bpy.props import StringProperty
 
 from ..maxwell import maxwell
 from .. import MaxwellRenderAddon
+
+hdr_8x8 = [0x23, 0x3F, 0x52, 0x41, 0x44, 0x49, 0x41, 0x4E, 0x43, 0x45, 0x0A, 0x47, 0x41, 0x4D, 0x4D, 0x41,
+           0x3D, 0x31, 0x0A, 0x45, 0x58, 0x50, 0x4F, 0x53, 0x55, 0x52, 0x45, 0x3D, 0x31, 0x0A, 0x46, 0x4F,
+           0x52, 0x4D, 0x41, 0x54, 0x3D, 0x33, 0x32, 0x2D, 0x62, 0x69, 0x74, 0x5F, 0x72, 0x6C, 0x65, 0x5F,
+           0x72, 0x67, 0x62, 0x65, 0x0A, 0x0A, 0x2D, 0x59, 0x20, 0x38, 0x20, 0x2B, 0x58, 0x20, 0x38, 0x0A,
+           0x02, 0x02, 0x00, 0x08, 0x88, 0x80, 0x88, 0x80, 0x88, 0x80, 0x88, 0x81, 0x02, 0x02, 0x00, 0x08,
+           0x88, 0x80, 0x88, 0x80, 0x88, 0x80, 0x88, 0x81, 0x02, 0x02, 0x00, 0x08, 0x88, 0x80, 0x88, 0x80,
+           0x88, 0x80, 0x88, 0x81, 0x02, 0x02, 0x00, 0x08, 0x88, 0x80, 0x88, 0x80, 0x88, 0x80, 0x88, 0x81,
+           0x02, 0x02, 0x00, 0x08, 0x88, 0x80, 0x88, 0x80, 0x88, 0x80, 0x88, 0x81, 0x02, 0x02, 0x00, 0x08,
+           0x88, 0x80, 0x88, 0x80, 0x88, 0x80, 0x88, 0x81, 0x02, 0x02, 0x00, 0x08, 0x88, 0x80, 0x88, 0x80,
+           0x88, 0x80, 0x88, 0x81, 0x02, 0x02, 0x00, 0x08, 0x88, 0x80, 0x88, 0x80, 0x88, 0x80, 0x88, 0x81 ]
+
+AxisMatrix3 = axis_conversion(from_forward='Y', from_up='Z', to_forward='-Z', to_up='Y')
+
+AxisMatrix = AxisMatrix3.to_4x4()
+
 
 @MaxwellRenderAddon.addon_register_class
 class ExportMXS(bpy.types.Operator, ExportHelper):
@@ -41,24 +57,23 @@ class ExportMXS(bpy.types.Operator, ExportHelper):
 menu_func = lambda self, context: self.layout.operator(ExportMXS.bl_idname, text="Export Maxwell Scene (.mxs)")
 bpy.types.INFO_MT_file_export.append(menu_func)
 
-
-pi = math.pi
-TRANSFORM_MATRIX = mathutils.Matrix().Rotation( -pi /2 , 4, 'X')  # rotate -90 degree around the x axis
-
 def Matrix2CbaseNPivot(m):
-    m = TRANSFORM_MATRIX * m
-    base = maxwell.Base()
+    m = AxisMatrix * m
+
+    base = Matrix2Cbase(Matrix.Identity(3))
     base.origin = toCvector(m.col[3])
-    base.xAxis = toCvector([1,0,0])
-    base.yAxis = toCvector([0,1,0])
-    base.zAxis = toCvector([0,0,1])
+    '''base = maxwell.Base()
+
+    base.x = toCvector([1,0,0])
+    base.y = toCvector([0,1,0])
+    base.z = toCvector([0,0,1])'''
 
     pivot = Matrix2Cbase(m)
 
     return base, pivot
 
 def Matrix2Cbase(m):
-    return maxwell.Base(maxwell.Vector(0,0,0), toCvector(m.col[0]), toCvector(m.col[1]),toCvector(m.col[2]))
+    return maxwell.Base().set(maxwell.Vector(0,0,0), toCvector(m.col[0]), toCvector(m.col[1]),toCvector(m.col[2]))
 
 def toCvector(vec):
     '''create a Cvector type from a blender mathutils.Vector'''
@@ -72,8 +87,8 @@ def save(operator, context, filepath=""):
 
     time_main = time.time()
     mxs_scene = maxwell.maxwell()
-    mxs_scene.setPluginID("Blender Maxwell")
-    mxs_scene.setInputDataType('YZXRH')
+    #mxs_scene.setPluginID("Blender Maxwell")
+    #mxs_scene.setInputDataType('YZXRH')
 
     for o in context.scene.objects:
         if(o.type == 'MESH' and o.is_visible(context.scene) and not o.is_duplicator):
@@ -114,7 +129,7 @@ def save(operator, context, filepath=""):
 # export the given Blender camera into the maxwell scene
 def export_camera(camera, mxs_scene, res_x, res_y):
     #figure out position, rot and look-at
-    matrix = TRANSFORM_MATRIX * camera.matrix_world.copy()
+    matrix = AxisMatrix * camera.matrix_world.copy()
     pos = (matrix.col[3])
     direct = ((matrix.col[3] - matrix.col[2]))
     up = matrix.col[1].to_3d().normalized()

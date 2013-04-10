@@ -1,26 +1,22 @@
 import bpy
 import os
 import time
-import math
 import re
 
 from mathutils import Matrix, Vector
 from bpy_extras.io_utils import unpack_list, unpack_face_list
 from bpy_extras.image_utils import load_image
-from bpy_extras.io_utils import ImportHelper
+from bpy_extras.io_utils import ImportHelper, axis_conversion
 from bpy.props import StringProperty, BoolProperty
 from collections import OrderedDict
 from .. import MaxwellRenderAddon
 
 from ..maxwell import maxwell
-#from ..pymaxwell import *
 from ..outputs import MaxwellLog
 
-pi = math.pi
 
-AxisMatrix3 = Matrix(((1, 0,  0),
-                      (0, 0, -1),
-                      (0, 1,  0))) # mathutils.Matrix().Rotation( -pi /2 , 4, 'X').inverted()
+AxisMatrix3  = axis_conversion(from_forward='-Z', from_up='Y', to_forward='Y', to_up='Z')
+
 
 AxisMatrix = AxisMatrix3.to_4x4()
 
