@@ -309,7 +309,10 @@ class SceneImporter():
                 if len(textures) > 0:
                     MaxwellLog(textures)
                     bmat.use_nodes = True
-                    n = bmat.node_tree.nodes.new('ShaderNodeTexImage')
+                    if bpy.app.version > (2,66,2): #pynodes merge ?
+                        n = bmat.node_tree.nodes.new('ShaderNodeTexImage')
+                    else:
+                        n = bmat.node_tree.nodes.new('TEX_IMAGE')
                     n.image = textures[tex]
                     try:
                         bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
