@@ -14,9 +14,7 @@ from .. import MaxwellRenderAddon
 from ..maxwell import maxwell
 from ..outputs import MaxwellLog
 
-
 AxisMatrix3  = axis_conversion(from_forward='-Z', from_up='Y', to_forward='Y', to_up='Z')
-
 
 AxisMatrix = AxisMatrix3.to_4x4()
 
@@ -192,7 +190,7 @@ class SceneImporter():
                     max_normal = max(max_normal, n1, n2, n3)
                     mat = obj.getTriangleMaterial(i)
                     if not mat.isNull():
-                      mat_name = mat.getName()
+                      mat_name = mat.name
                       if not mat_name in mats:
                         mats[mat_name] = len(mats)
                       mat_index.append(mats[mat_name])
@@ -277,11 +275,11 @@ class SceneImporter():
         for mat in self.mxs_scene.getMaterialsIterator():
             if mat.isNull():
                 continue
-            mat_name = mat.getName()
+            mat_name = mat.name
             if mat_name in self.context.blend_data.materials:
                 self.materials[mat_name] = self.context.blend_data.materials[mat_name]
             else:
-                bmat = bpy.data.materials.new(mat.getName())
+                bmat = bpy.data.materials.new(mat.name)
                 r, g, b = 0.7, 0.7, 0.7
                 textures = {}
                 MaxwellLog("Laoding Material: {}".format(mat_name))
@@ -303,8 +301,6 @@ class SceneImporter():
                                 i = None
                             if i:
                                 textures[tex] = i
-                                #bpy.data.images.load()
-                                #MaxwellLog(r,g,b)'''
                 bmat.diffuse_color = (r, g, b)
                 if len(textures) > 0:
                     MaxwellLog(textures)
@@ -334,7 +330,7 @@ class SceneImporter():
                 parent_name = o.getName()
                 mat = obj.getMaterial()
                 if not mat.isNull():
-                    mat = mat.getName()
+                    mat = mat.name
                 else:
                     mat = 'None'
                 matrix = CbasePivot2Matrix(base,pivot)

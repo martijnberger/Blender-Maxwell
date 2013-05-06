@@ -41,6 +41,7 @@ class RENDERENGINE_maxwell(bpy.types.RenderEngine):
     def update(self, data, scene):
         pass
     def render(self, scene):
+        print("RENDER")
         pass
 
     def preview_update(self, context, id):

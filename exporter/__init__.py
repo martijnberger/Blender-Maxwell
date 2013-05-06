@@ -1,7 +1,8 @@
 import time
 import math
 import bpy
-import mathutils
+import struct
+
 from mathutils import Matrix, Vector
 from bpy_extras.io_utils import ExportHelper, axis_conversion
 from ..outputs import MaxwellLog
@@ -24,6 +25,11 @@ hdr_8x8 = [0x23, 0x3F, 0x52, 0x41, 0x44, 0x49, 0x41, 0x4E, 0x43, 0x45, 0x0A, 0x4
 AxisMatrix3 = axis_conversion(from_forward='Y', from_up='Z', to_forward='-Z', to_up='Y')
 
 AxisMatrix = AxisMatrix3.to_4x4()
+
+def write_bytes_to_file(file='/tmp/8x8_white.hdr', bytes=hdr_8x8):
+    with open('/tmp/8x8.hdr','wb') as f:
+        for b in bytes:
+            f.write(struct.pack('B',b))
 
 
 @MaxwellRenderAddon.addon_register_class
