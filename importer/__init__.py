@@ -22,6 +22,7 @@ def CbasePivot2Matrix(b,p):
     """Broken for some reason)"""
     return  AxisMatrix * Cbase2Matrix4(b) * Cbase2Matrix4(p)
 
+
 def Cbase2Matrix3(b):
     x = b.x
     z = b.z
@@ -75,6 +76,18 @@ class ImportMXS(bpy.types.Operator, ImportHelper):
         default=True,
     )
 
+    import_instances = BoolProperty(
+        name="Instances",
+        description="Import instances's",
+        default=True,
+    )
+
+    apply_scale = BoolProperty(
+        name="Apply Scale",
+        description="Apply scale to imported objects",
+        default=True,
+    )
+
     handle_proxy_group = BoolProperty(
         name="Proxy",
         description="Attempt to find groups for meshes names *_proxy*",
@@ -97,7 +110,10 @@ class ImportMXS(bpy.types.Operator, ImportHelper):
         row.prop(self, "import_material")
         row = layout.row(align=True)
         row.prop(self, "import_meshes")
+        row.prop(self, "import_instances")
+        row = layout.row(align=True)
         row.prop(self, "handle_proxy_group")
+        row.prop(self, "apply_scale")
 
 menu_func = lambda self, context: self.layout.operator(ImportMXS.bl_idname, text="Import Maxwell Scene(.mxs)")
 bpy.types.INFO_MT_file_import.append(menu_func)
@@ -145,7 +161,7 @@ class SceneImporter():
       cam.name = camera.getName()
 
 
-    def write_mesh(self, obj):
+    def write_mesh(self, obj, **options):
         """
             Write a mesh
         """
@@ -246,23 +262,33 @@ class SceneImporter():
             if not proxy_group:
                 ob.matrix_world = CbasePivot2Matrix(base,pivot)
             else:
-                pass
+                matr = CbasePivot2Matrix(base,pivot)
+                matr2 = (axis_conversion(from_forward='Y', from_up='Z', to_forward='-Z', to_up='Y') * Matrix.Scale(1 / 0.0254, 3) * matr.to_3x3()).to_4x4()
+                matr2.col[3] = matr.col[3]
+                ob.matrix_world = matr2
 
-
-            try:
-                inv_matrix = ob.matrix_basis
-                inv_matrix = inv_matrix.to_3x3().inverted().to_4x4()
-                MaxwellLog("INV: {}".format(inv_matrix))
-            except ValueError:
-                MaxwellLog("Cannot invert {}".format(ob.matrix_basis))
+            if not options['apply_scale']:
                 inv_matrix = Matrix.Identity(4)
+            else:
+                try:
+                    inv_matrix = ob.matrix_basis
+                    inv_matrix = inv_matrix.to_3x3().inverted().to_4x4()
+                    #MaxwellLog("INV: {}".format(inv_matrix))
+                except ValueError:
+                    MaxwellLog("Cannot invert {}".format(ob.matrix_basis))
+                    inv_matrix = Matrix.Identity(4)
+
             self.context.scene.objects.link(ob)
             self.context.scene.objects.active = ob
 
-            if not proxy_group:
+            if not proxy_group and options['apply_scale']:
                 ob.select = True
                 bpy.ops.object.transform_apply(rotation=True,scale=True)
                 ob.select = False
+            else:
+                pass
+                #if bettername != 'conveyor_band5000':
+                #    bpy.ops.crash()
 
             return name, (ob, inv_matrix, proxy_group)
         else:
@@ -428,12 +454,12 @@ class SceneImporter():
         return
 
 
-    def write_objects(self):
+    def write_objects(self, **options):
         t1 = time.time()
         self.ob_dict = {}
         for obj in self.mxs_scene.getObjectIterator():
             if (not obj.isNull()) and obj.isMesh():
-                name, ob = self.write_mesh(obj)
+                name, ob = self.write_mesh(obj, **options)
                 self.ob_dict[name] = ob
         t2 = time.time()
         MaxwellLog('imported %d objects in %.4f sec' % (len(self.ob_dict), (t2 - t1)))
@@ -468,7 +494,8 @@ class SceneImporter():
             self.write_materials()
 
         if options['import_meshes']:
-            self.write_objects()
+            self.write_objects(**options)
+        if options['import_instances']:
             self.write_instances()
 
 
