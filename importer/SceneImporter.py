@@ -32,6 +32,7 @@ from ..outputs import MaxwellLog
 class SceneImporter():
     def __init__(self):
         self.filepath = '/tmp/untitled.mxs'
+        self.name_mapping = {}
 
     def set_filename(self, filename):
         self.filepath = filename
@@ -66,8 +67,6 @@ class SceneImporter():
       # Cycles
       cam.cycles.aperture_fstop = fStop
       cam.clip_end = self.prefs.camera_far_plane
-      # Luxrender
-      #cam.luxrender_camera.fstop = fStop
       cam.name = camera.getName()
 
 
@@ -122,7 +121,6 @@ class SceneImporter():
             mats_sorted = OrderedDict(sorted(mats.items(), key=lambda x: x[1]))
             for k in mats_sorted.keys():
                 me.materials.append(self.materials[k])
-    #            print("setting {}".format(mat_name, k ))
         else:
             MaxwellLog("WARNING OBJECT {} HAS NO MATERIAL".format(obj.getName()))
 
@@ -140,9 +138,35 @@ class SceneImporter():
         return me, len(verts)
 
 
-    def write_mesh(self, obj, **options):
+    def cleanup_name(self, name):
+        '''
+            Create a better name
+        '''
+        # TODO FIXME should check to see if we insert a double
+        if name in self.name_mapping:
+            return self.name_mapping[name]
+        MaxwellLog('cleaning up {} -> '.format(name, re.match('<(.*)>', name)))
+        try: # strip of ' [0.0.0]' and alike
+            bettername = re.match('(.*) \[\d{1,3}\.\d{1,3}\.\d{1,3}\]', name).group(1)
+        except AttributeError as err:
+            bettername = name
+        self.name_mapping[name] = bettername
+        return bettername
+
+    def find_blender_group(self, name):
+        if '#' in name:
+            name = re.match('(.*)#', name).group(0)
+        bettername = name[:-6]
+        if bettername in bpy.data.groups.keys():
+            #MaxwellLog("FOUND {} GROUP".format(bettername))
+            return True, bettername
+        else:
+            MaxwellLog("COULD NOT FIND GROUP FOR {}".format(bettername))
+            return False, name
+
+    def write_mesh_object(self, obj, **options):
         """
-            Write a mesh
+            Write a Blender object based on the Maxwell object without any instances.
         """
         n = 1
         if (not obj.isNull()) and obj.isMesh() and (obj.getNumTriangles() > 0 and obj.getNumVertexes() > 0):
@@ -153,20 +177,14 @@ class SceneImporter():
                 name = 'corrupt' + str(n)
                 n += 1
 
-            proxy_group = False
-            if 'proxy' in name:
-                bettername = re.match('<(.*)>', name).group(1)
-                if '#' in bettername:
-                    bettername = re.match('(.*)#', bettername).group(1)
-                bettername = bettername[:-6]
-                if bettername in bpy.data.groups.keys():
-                    MaxwellLog("FOUND {} GROUP".format(bettername))
-                    proxy_group = True
-                    name = bettername
-                else:
-                    MaxwellLog("COULD NOT FIND GROUP FOR {}".format(bettername))
+            name = self.cleanup_name(name)
 
-            (base, pivot) = obj.getBaseAndPivot()
+            if 'proxy' in name:
+                proxy_group, name = self.find_blender_group(name)
+            else:
+                proxy_group = False
+
+            base, pivot = obj.getBaseAndPivot()
 
             if not proxy_group:
                 me, num_verts = self.write_mesh_data(obj, name)
@@ -283,7 +301,7 @@ class SceneImporter():
                 (base, pivot) = obj.getBaseAndPivot()
                 instance_count += 1
                 o = obj.getInstanced()
-                parent_name = o.getName()
+                parent_name = self.cleanup_name(o.getName())
                 mat = obj.getMaterial()
                 if not mat.isNull():
                     mat = mat.name
@@ -301,8 +319,6 @@ class SceneImporter():
         imported_count = 0
         for k, v in instances.items():
             parent_name, mat = k
-            if '79970' in parent_name:
-                MaxwellLog('GOT IT \n{}\n'.format(v))
 
             max_instances = 50
             if not parent_name in self.ob_dict:
@@ -334,7 +350,6 @@ class SceneImporter():
                     except KeyError:
                         pass
             else:
-                MaxwellLog("{} has more then {} instances ({}) trying dupliverts".format(parent_name, max_instances,len(v)))
                 locations = {}
                 for m in v:
                     l = (m.col[3][0], m.col[3][1], m.col[3][2])
@@ -344,12 +359,13 @@ class SceneImporter():
                         locations[key][0].append((l[0] - t[0],l[1] - t[1],l[2] - t[2] ))
                     else:
                         locations[key] = ([(0,0,0)], l)
+                MaxwellLog("{} has more then {} instances ({}) creating {} duplivert groups".format(parent_name, max_instances,len(v),len(locations)))
 
 
 
                 for trans, ver in locations.items():
                     verts, t = ver
-                    MaxwellLog("{} : {} locations".format(k[0], len(verts)))
+                    #MaxwellLog("{} : {} locations".format(k[0], len(verts)))
                     dme = bpy.data.meshes.new(k[0])
                     dme.vertices.add(len(verts))
                     dme.vertices.foreach_set("co", unpack_list(verts))
@@ -361,7 +377,9 @@ class SceneImporter():
                     dmatrix.col[3] = t[0], t[1], t[2], 1
                     dob.matrix_basis = dmatrix
 
-                    w = Matrix([(trans[0], trans[1], trans[2]), (trans[3], trans[4], trans[5]), (trans[6], trans[7], trans[8])])
+                    w = Matrix([(trans[0], trans[1], trans[2]),
+                                (trans[3], trans[4], trans[5]),
+                                (trans[6], trans[7], trans[8])])
                     ob, inv_matrix, proxy_group = self.ob_dict[parent_name]
                     ob = ob.copy()
                     ls = (w * inv_matrix.to_3x3() ).to_4x4()
@@ -392,7 +410,7 @@ class SceneImporter():
         self.ob_dict = {}
         for obj in self.mxs_scene.getObjectIterator():
             if (not obj.isNull()) and obj.isMesh():
-                name, ob = self.write_mesh(obj, **options)
+                name, ob = self.write_mesh_object(obj, **options)
                 self.ob_dict[name] = ob
         t2 = time.time()
         MaxwellLog('imported %d objects in %.4f sec' % (len(self.ob_dict), (t2 - t1)))
