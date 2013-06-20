@@ -61,12 +61,18 @@ class ExampleAddonPreferences(AddonPreferences):
             name="Draw object as bounds when over",
             default=5000,
             )
+    max_instance = IntProperty(
+            name="Create DUPLI vert instance when count over",
+            default=50,
+            )
 
 
     def draw(self, context):
         layout = self.layout
         layout.label(text="MXS import options:")
         layout.prop(self, "camera_far_plane")
+        layout.prop(self, "draw_bounds")
+        layout.prop(self, "max_instance")
 
 
 

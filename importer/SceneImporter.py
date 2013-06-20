@@ -150,8 +150,11 @@ class SceneImporter():
             bettername = re.match('(.*) \[\d{1,3}\.\d{1,3}\.\d{1,3}\]', name).group(1)
         except AttributeError as err:
             bettername = name
-        self.name_mapping[name] = bettername
-        return bettername
+        while name in self.name_mapping:
+            name += '_'
+        else: # we found a unique name, lets insert it
+            self.name_mapping[name] = bettername
+            return bettername
 
     def find_blender_group(self, name):
         if '#' in name:
@@ -320,7 +323,7 @@ class SceneImporter():
         for k, v in instances.items():
             parent_name, mat = k
 
-            max_instances = 50
+            max_instances = self.prefs.max_instance
             if not parent_name in self.ob_dict:
                 MaxwellLog('Cannot find object to instance: {}'.format(parent_name))
                 continue
