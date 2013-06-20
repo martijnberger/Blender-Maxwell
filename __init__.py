@@ -1,3 +1,6 @@
+__author__ = 'Martijn Berger'
+__license__ = "GPL"
+
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 2
@@ -10,9 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
-#
-# ***** END GPL LICENCE BLOCK *****
-#
+
 
 bl_info = {
     "name": "NextLimit Maxwell importer/exporter",
@@ -55,6 +56,10 @@ class ExampleAddonPreferences(AddonPreferences):
     camera_far_plane = IntProperty(
             name="Default Camera Distance",
             default=1250,
+            )
+    draw_bounds = IntProperty(
+            name="Draw object as bounds when over",
+            default=5000,
             )
 
 

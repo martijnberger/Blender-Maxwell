@@ -1,4 +1,18 @@
-__author__ = 'mberger'
+__author__ = 'Martijn Berger'
+__license__ = "GPL"
+
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 import bpy
 import os
@@ -62,7 +76,6 @@ class SceneImporter():
             Convert maxwell object into blender mesh datablock
             precond: check that obj != null and that it is actually a mesh
         '''
-        triangles = obj.getNumTriangles()
         uv_layer_count = obj.getNumChannelsUVW()
         verts = []
         faces = []
@@ -73,7 +86,7 @@ class SceneImporter():
         uvs = []
         max_vertex = 0
         max_normal = 0
-        for i in range(triangles):
+        for i in range(obj.getNumTriangles()):
             triangle = obj.getTriangle(i)
             (v1, v2, v3, n1, n2, n3) = triangle
             max_vertex = max(max_vertex, v1, v2, v3)
@@ -92,7 +105,9 @@ class SceneImporter():
             vert_norm[v3] = n3
             if uv_layer_count > 0:
               u1, v1, w1, u2, v2, w2, u3, v3, w3 = obj.getTriangleUVW(i, 0)
-              uvs.append(( u1, -1.0 * v1, u2, -1.0 * v2, u3, -1.0 * v3, 0.0, 0.0 ))
+              uvs.append(( u1, -1.0 * v1,
+                           u2, -1.0 * v2,
+                           u3, -1.0 * v3, 0.0, 0.0 ))
         for i in range(max_vertex + 1):
             vert = obj.getVertex(i, 0)
             verts.append((vert.x, vert.y, vert.z))
@@ -154,7 +169,7 @@ class SceneImporter():
             if not proxy_group:
                 me, num_verts = self.write_mesh_data(obj, name)
                 ob = bpy.data.objects.new(name, me)
-                if num_verts > 5000:
+                if num_verts > self.prefs.draw_bounds:
                     ob.draw_type = 'BOUNDS'
                 me.update(calc_edges=True)
             else:
