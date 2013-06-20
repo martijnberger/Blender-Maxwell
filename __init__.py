@@ -17,15 +17,18 @@
 bl_info = {
     "name": "NextLimit Maxwell importer/exporter",
     "author": "Martijn Berger",
-    "version": (0, 0, 3, 'dev'),
-    "blender": (2, 6, 3),
+    "version": (0, 0, 4, 'dev'),
+    "blender": (2, 6, 5),
     "description": "Render scenes with Maxwell render and import/export MXS",
     "warning": "Very early preview",
-    "wiki_url": "http://www.nextlimit.com",
+    "wiki_url": "https://github.com/martijnberger/Blender-Maxwell",
     "tracker_url": "",
     "category": "Render",
     "location": "Info Header > Engine dropdown menu"}
 
+import bpy
+from bpy.types import Operator, AddonPreferences
+from bpy.props import StringProperty, IntProperty, BoolProperty
 
 if 'core' in locals():
     import imp
@@ -37,9 +40,29 @@ else:
     MaxwellRenderAddon = Addon(bl_info)
     register, unregister = MaxwellRenderAddon.init_functions()
 
+
     # Importing the core package causes extensions_framework managed
     # RNA class registration via @MaxwellRenderAddon.addon_register_class
     from . import core
+
+
+@MaxwellRenderAddon.addon_register_class
+class ExampleAddonPreferences(AddonPreferences):
+    # this must match the addon name, use '__package__'
+    # when defining this in a submodule of a python package.
+    bl_idname = __name__
+
+    camera_far_plane = IntProperty(
+            name="Default Camera Distance",
+            default=1250,
+            )
+
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="MXS import options:")
+        layout.prop(self, "camera_far_plane")
+
 
 
 

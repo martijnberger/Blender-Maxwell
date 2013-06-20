@@ -51,9 +51,78 @@ class SceneImporter():
       cam.shift_y = shift_y / -200.0
       # Cycles
       cam.cycles.aperture_fstop = fStop
+      cam.clip_end = self.prefs.camera_far_plane
       # Luxrender
       #cam.luxrender_camera.fstop = fStop
       cam.name = camera.getName()
+
+
+    def write_mesh_data(self, obj, name):
+        '''
+            Convert maxwell object into blender mesh datablock
+            precond: check that obj != null and that it is actually a mesh
+        '''
+        triangles = obj.getNumTriangles()
+        uv_layer_count = obj.getNumChannelsUVW()
+        verts = []
+        faces = []
+        normals = []
+        vert_norm = {}
+        mats = {}
+        mat_index = []
+        uvs = []
+        max_vertex = 0
+        max_normal = 0
+        for i in range(triangles):
+            triangle = obj.getTriangle(i)
+            (v1, v2, v3, n1, n2, n3) = triangle
+            max_vertex = max(max_vertex, v1, v2, v3)
+            max_normal = max(max_normal, n1, n2, n3)
+            mat = obj.getTriangleMaterial(i)
+            if not mat.isNull():
+              mat_name = mat.name
+              if not mat_name in mats:
+                mats[mat_name] = len(mats)
+              mat_index.append(mats[mat_name])
+            else:
+              mat_index.append(0)
+            faces.append((v1, v2, v3))
+            vert_norm[v1] = n1
+            vert_norm[v2] = n2
+            vert_norm[v3] = n3
+            if uv_layer_count > 0:
+              u1, v1, w1, u2, v2, w2, u3, v3, w3 = obj.getTriangleUVW(i, 0)
+              uvs.append(( u1, -1.0 * v1, u2, -1.0 * v2, u3, -1.0 * v3, 0.0, 0.0 ))
+        for i in range(max_vertex + 1):
+            vert = obj.getVertex(i, 0)
+            verts.append((vert.x, vert.y, vert.z))
+        for i in range(max_vertex + 1):
+            n = obj.getNormal(vert_norm[i],0)
+            normals.append((n.x, n.y, n.z))
+
+        me = bpy.data.meshes.new(name)
+        me.vertices.add(len(verts))
+        me.tessfaces.add(len(faces))
+        if len(mats) >= 1:
+            mats_sorted = OrderedDict(sorted(mats.items(), key=lambda x: x[1]))
+            for k in mats_sorted.keys():
+                me.materials.append(self.materials[k])
+    #            print("setting {}".format(mat_name, k ))
+        else:
+            MaxwellLog("WARNING OBJECT {} HAS NO MATERIAL".format(obj.getName()))
+
+        me.vertices.foreach_set("co", unpack_list(verts))
+        me.vertices.foreach_set("normal",  unpack_list(normals))
+        me.tessfaces.foreach_set("vertices_raw", unpack_face_list(faces))
+        me.tessfaces.foreach_set("material_index", mat_index)
+        if len(uvs) > 0:
+            me.tessface_uv_textures.new()
+            for i in range(len(uvs)):
+                me.tessface_uv_textures[0].data[i].uv_raw = uvs[i]
+
+        me.update(calc_edges=True)    # Update mesh with new data
+        me.validate()
+        return me, len(verts)
 
 
     def write_mesh(self, obj, **options):
@@ -83,69 +152,9 @@ class SceneImporter():
 
 
             if not proxy_group:
-                triangles = obj.getNumTriangles()
-                uv_layer_count = obj.getNumChannelsUVW()
-                verts = []
-                faces = []
-                normals = []
-                vert_norm = {}
-                mats = {}
-                mat_index = []
-                uvs = []
-                max_vertex = 0
-                max_normal = 0
-                for i in range(triangles):
-                    triangle = obj.getTriangle(i)
-                    (v1, v2, v3, n1, n2, n3) = triangle
-                    max_vertex = max(max_vertex, v1, v2, v3)
-                    max_normal = max(max_normal, n1, n2, n3)
-                    mat = obj.getTriangleMaterial(i)
-                    if not mat.isNull():
-                      mat_name = mat.name
-                      if not mat_name in mats:
-                        mats[mat_name] = len(mats)
-                      mat_index.append(mats[mat_name])
-                    else:
-                      mat_index.append(0)
-                    faces.append((v1, v2, v3))
-                    vert_norm[v1] = n1
-                    vert_norm[v2] = n2
-                    vert_norm[v3] = n3
-                    if uv_layer_count > 0:
-                      u1, v1, w1, u2, v2, w2, u3, v3, w3 = obj.getTriangleUVW(i, 0)
-                      uvs.append(( u1, -1.0 * v1, u2, -1.0 * v2, u3, -1.0 * v3, 0.0, 0.0 ))
-                for i in range(max_vertex + 1):
-                    vert = obj.getVertex(i, 0)
-                    verts.append((vert.x, vert.y, vert.z))
-                for i in range(max_vertex + 1):
-                    n = obj.getNormal(vert_norm[i],0)
-                    normals.append((n.x, n.y, n.z))
-
-                me = bpy.data.meshes.new(name)
-                me.vertices.add(len(verts))
-                me.tessfaces.add(len(faces))
-                if len(mats) >= 1:
-                    mats_sorted = OrderedDict(sorted(mats.items(), key=lambda x: x[1]))
-                    for k in mats_sorted.keys():
-                        me.materials.append(self.materials[k])
-            #            print("setting {}".format(mat_name, k ))
-                else:
-                    MaxwellLog("WARNING OBJECT {} HAS NO MATERIAL".format(obj.getName()))
-
-                me.vertices.foreach_set("co", unpack_list(verts))
-                me.vertices.foreach_set("normal",  unpack_list(normals))
-                me.tessfaces.foreach_set("vertices_raw", unpack_face_list(faces))
-                me.tessfaces.foreach_set("material_index", mat_index)
-                if len(uvs) > 0:
-                    me.tessface_uv_textures.new()
-                    for i in range(len(uvs)):
-                        me.tessface_uv_textures[0].data[i].uv_raw = uvs[i]
-
-                me.update(calc_edges=True)    # Update mesh with new data
-                me.validate()
-
+                me, num_verts = self.write_mesh_data(obj, name)
                 ob = bpy.data.objects.new(name, me)
-                if len(verts) > 5000:
+                if num_verts > 5000:
                     ob.draw_type = 'BOUNDS'
                 me.update(calc_edges=True)
             else:
@@ -190,7 +199,11 @@ class SceneImporter():
             MaxwellLog('NOT DONE:', obj.getName(), ' NULL: ', obj.isNull(), '  ', obj.getNumVertexes(), '  ', obj.getNumTriangles())
             return None, None
 
+
     def write_materials(self):
+        '''
+            Convert Maxwell material to a blender cycles material
+        '''
         self.materials = {}
         MaxwellLog("write_materials : iter")
         for mat in self.mxs_scene.getMaterialsIterator():
@@ -238,7 +251,11 @@ class SceneImporter():
                         pass
                 self.materials[mat_name] = bmat
 
+
     def write_instances(self):
+        '''
+            Attempt to convert maxwell intances to something like a dupligroup or better.
+        '''
         instances = {}
         t1 = time.time()
         instance_count = 0
@@ -317,7 +334,7 @@ class SceneImporter():
                     dme.vertices.foreach_set("co", unpack_list(verts))
                     dme.update(calc_edges=True)    # Update mesh with new data
                     dme.validate()
-                    dob = bpy.data.objects.new("DUPLI" + k[0], dme)
+                    dob = bpy.data.objeself.prefscts.new("DUPLI" + k[0], dme)
                     dob.dupli_type = 'VERTS'
                     dmatrix = Matrix.Identity(4)
                     dmatrix.col[3] = t[0], t[1], t[2], 1
@@ -365,6 +382,9 @@ class SceneImporter():
         self.context = context
 
         MaxwellLog('importing mxs %r' % self.filepath)
+
+        addon_name = __name__.split('.')[0]
+        self.prefs = addon_prefs = context.user_preferences.addons[addon_name].preferences
 
         time_main = time.time()
         mxs_scene = maxwell.maxwell()
