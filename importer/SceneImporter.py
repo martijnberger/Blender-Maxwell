@@ -144,15 +144,16 @@ class SceneImporter():
         """
             Write a mesh
         """
-        proxy_group = False
-        n = 0
-        bettername = ""
+        n = 1
         if (not obj.isNull()) and obj.isMesh() and (obj.getNumTriangles() > 0 and obj.getNumVertexes() > 0):
             try:
                 name = obj.getName()
             except UnicodeDecodeError:
                 obj.setName('corrupt' + str(n))
                 name = 'corrupt' + str(n)
+                n += 1
+
+            proxy_group = False
             if 'proxy' in name:
                 bettername = re.match('<(.*)>', name).group(1)
                 if '#' in bettername:
@@ -161,10 +162,11 @@ class SceneImporter():
                 if bettername in bpy.data.groups.keys():
                     MaxwellLog("FOUND {} GROUP".format(bettername))
                     proxy_group = True
+                    name = bettername
                 else:
                     MaxwellLog("COULD NOT FIND GROUP FOR {}".format(bettername))
-            (base, pivot) = obj.getBaseAndPivot()
 
+            (base, pivot) = obj.getBaseAndPivot()
 
             if not proxy_group:
                 me, num_verts = self.write_mesh_data(obj, name)
@@ -173,9 +175,9 @@ class SceneImporter():
                     ob.draw_type = 'BOUNDS'
                 me.update(calc_edges=True)
             else:
-                ob = bpy.data.objects.new(bettername, None)
+                ob = bpy.data.objects.new(name, None)
                 ob.dupli_type = 'GROUP'
-                ob.dupli_group = bpy.data.groups[bettername]
+                ob.dupli_group = bpy.data.groups[name]
 
 
             if not proxy_group:
@@ -186,9 +188,11 @@ class SceneImporter():
                 matr2.col[3] = matr.col[3]
                 ob.matrix_world = matr2
 
-            if not options['apply_scale']:
-                inv_matrix = Matrix.Identity(4)
-            else:
+            self.context.scene.objects.link(ob)
+            self.context.scene.objects.active = ob
+
+
+            if options['apply_scale']:
                 try:
                     inv_matrix = ob.matrix_basis
                     inv_matrix = inv_matrix.to_3x3().inverted().to_4x4()
@@ -196,18 +200,17 @@ class SceneImporter():
                 except ValueError:
                     MaxwellLog("Cannot invert {}".format(ob.matrix_basis))
                     inv_matrix = Matrix.Identity(4)
+            else:
+                inv_matrix = Matrix.Identity(4)
 
-            self.context.scene.objects.link(ob)
-            self.context.scene.objects.active = ob
 
             if not proxy_group and options['apply_scale']:
                 ob.select = True
                 bpy.ops.object.transform_apply(rotation=True,scale=True)
                 ob.select = False
-            else:
+            else:   # not applying scale so inverted operation is identity matrix
                 pass
-                #if bettername != 'conveyor_band5000':
-                #    bpy.ops.crash()
+                #inv_matrix = Matrix.Identity(4)
 
             return name, (ob, inv_matrix, proxy_group)
         else:
@@ -231,7 +234,7 @@ class SceneImporter():
                 bmat = bpy.data.materials.new(mat.name)
                 r, g, b = 0.7, 0.7, 0.7
                 textures = {}
-                MaxwellLog("Laoding Material: {}".format(mat_name))
+                #MaxwellLog("Laoding Material: {}".format(mat_name))
                 if mat.getNumLayers() > 0:
                     layer = mat.getLayer(0)
                     if layer.getNumBSDFs() > 0:
@@ -298,6 +301,9 @@ class SceneImporter():
         imported_count = 0
         for k, v in instances.items():
             parent_name, mat = k
+            if '79970' in parent_name:
+                MaxwellLog('GOT IT \n{}\n'.format(v))
+
             max_instances = 50
             if not parent_name in self.ob_dict:
                 MaxwellLog('Cannot find object to instance: {}'.format(parent_name))
@@ -328,7 +334,7 @@ class SceneImporter():
                     except KeyError:
                         pass
             else:
-                MaxwellLog("{} has more then {} instances skipping: {}".format(parent_name, max_instances,len(v)))
+                MaxwellLog("{} has more then {} instances ({}) trying dupliverts".format(parent_name, max_instances,len(v)))
                 locations = {}
                 for m in v:
                     l = (m.col[3][0], m.col[3][1], m.col[3][2])
@@ -349,7 +355,7 @@ class SceneImporter():
                     dme.vertices.foreach_set("co", unpack_list(verts))
                     dme.update(calc_edges=True)    # Update mesh with new data
                     dme.validate()
-                    dob = bpy.data.objeself.prefscts.new("DUPLI" + k[0], dme)
+                    dob = bpy.data.objects.new("DUPLI" + k[0], dme)
                     dob.dupli_type = 'VERTS'
                     dmatrix = Matrix.Identity(4)
                     dmatrix.col[3] = t[0], t[1], t[2], 1
