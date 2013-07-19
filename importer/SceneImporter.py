@@ -392,8 +392,11 @@ class SceneImporter():
                         if len(ob.data.vertices) > 5000:
                             ob.draw_type = 'BOUNDS'
                         if not mat == 'None':
-                            ob.material_slots[0].link = 'OBJECT'
-                            ob.material_slots[0].material = self.materials[mat]
+                            try:
+                                ob.material_slots[0].link = 'OBJECT'
+                                ob.material_slots[0].material = self.materials[mat]
+                            except IndexError:
+                                pass
                     else:
                         ob.matrix_basis = ls
                         #ob.matrix_basis = MatrixScale(ls)
