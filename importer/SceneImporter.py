@@ -29,6 +29,50 @@ from .util import *
 from ..outputs import MaxwellLog
 
 
+
+def translate_material(mat, basepath):
+    """
+        mat -> refrence to the maxwell material
+        basepath -> string that references filepath where we look for referenced texture files
+    """
+    bmat = bpy.data.materials.new(mat.name)
+    r, g, b = 0.7, 0.7, 0.7
+    textures = {}
+    #MaxwellLog("Laoding Material: {}".format(mat_name))
+    if mat.getNumLayers() > 0:
+        layer = mat.getLayer(0)
+        if layer.getNumBSDFs() > 0:
+            bsdf = layer.getBSDF(0)
+            refl = bsdf.getReflectance()
+            color = refl.getColor('color')
+            r, g, b = color.rgb.r, color.rgb.g, color.rgb.b
+            tex_path = color.pFileName
+            if tex_path:
+                tex = str(tex_path,'UTF-8').replace("\\","/")
+                MaxwellLog("LOADING: {}".format(tex))
+                tp = basepath + "/" + tex
+                try:
+                    i = bpy.data.images.load(tp)
+                except RuntimeError:
+                    i = None
+                if i:
+                    textures[tex] = i
+    bmat.diffuse_color = (r, g, b)
+    if len(textures) > 0:
+        MaxwellLog(textures)
+        bmat.use_nodes = True
+        if bpy.app.version > (2,66,2): #pynodes merge ?
+            n = bmat.node_tree.nodes.new('ShaderNodeTexImage')
+        else:
+            n = bmat.node_tree.nodes.new('TEX_IMAGE')
+        n.image = textures[tex]
+        try:
+            bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
+        except KeyError as e:
+            print(e)
+            pass
+    return bmat
+
 class SceneImporter():
     def __init__(self):
         self.filepath = '/tmp/untitled.mxs'
@@ -249,47 +293,13 @@ class SceneImporter():
             if mat.isNull():
                 continue
             mat_name = mat.name
+            rmat_name = mat_name.rstrip('1234567890')
             if mat_name in self.context.blend_data.materials:
                 self.materials[mat_name] = self.context.blend_data.materials[mat_name]
+            elif rmat_name in self.context.blend_data.materials:
+                self.materials[mat_name] = self.context.blend_data.materials[rmat_name]
             else:
-                bmat = bpy.data.materials.new(mat.name)
-                r, g, b = 0.7, 0.7, 0.7
-                textures = {}
-                #MaxwellLog("Laoding Material: {}".format(mat_name))
-                if mat.getNumLayers() > 0:
-                    layer = mat.getLayer(0)
-                    if layer.getNumBSDFs() > 0:
-                        bsdf = layer.getBSDF(0)
-                        refl = bsdf.getReflectance()
-                        color = refl.getColor('color')
-                        r, g, b = color.rgb.r, color.rgb.g, color.rgb.b
-                        tex_path = color.pFileName
-                        if tex_path:
-                            tex = str(tex_path,'UTF-8').replace("\\","/")
-                            MaxwellLog("LOADING: {}".format(tex))
-                            tp = self.basepath + "/" + tex
-                            try:
-                                i = bpy.data.images.load(tp)
-                            except RuntimeError:
-                                i = None
-                            if i:
-                                textures[tex] = i
-                bmat.diffuse_color = (r, g, b)
-                if len(textures) > 0:
-                    MaxwellLog(textures)
-                    bmat.use_nodes = True
-                    if bpy.app.version > (2,66,2): #pynodes merge ?
-                        n = bmat.node_tree.nodes.new('ShaderNodeTexImage')
-                    else:
-                        n = bmat.node_tree.nodes.new('TEX_IMAGE')
-                    n.image = textures[tex]
-                    try:
-                        bmat.node_tree.links.new(n.outputs['Color'], bmat.node_tree.nodes['Diffuse BSDF'].inputs['Color'] )
-                    except KeyError as e:
-                        print(e)
-                        pass
-                self.materials[mat_name] = bmat
-
+                self.materials[mat_name] = translate_material(mat, self.basepath)
 
     def write_instances(self):
         '''
