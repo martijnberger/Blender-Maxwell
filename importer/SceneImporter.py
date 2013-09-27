@@ -298,6 +298,8 @@ class SceneImporter():
                 self.materials[mat_name] = self.context.blend_data.materials[mat_name]
             elif rmat_name in self.context.blend_data.materials:
                 self.materials[mat_name] = self.context.blend_data.materials[rmat_name]
+            elif rmat_name.lower() in self.context.blend_data.materials:
+                self.materials[mat_name] = self.context.blend_data.materials[rmat_name.lower()]
             else:
                 self.materials[mat_name] = translate_material(mat, self.basepath)
 
