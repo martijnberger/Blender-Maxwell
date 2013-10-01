@@ -142,15 +142,29 @@ class SceneImporter():
               mat_index.append(mats[mat_name])
             else:
               mat_index.append(0)
-            faces.append((v1, v2, v3))
+            if v3 == 0: # eeekadoodle dance
+                faces.append((v2, v3, v1))
+                zero_face_start = True
+            else:
+                faces.append((v1, v2, v3))
+                zero_face_start = False
             vert_norm[v1] = n1
             vert_norm[v2] = n2
             vert_norm[v3] = n3
             if uv_layer_count > 0:
               u1, v1, w1, u2, v2, w2, u3, v3, w3 = obj.getTriangleUVW(i, 0)
-              uvs.append(( u1, -1.0 * v1,
-                           u2, -1.0 * v2,
-                           u3, -1.0 * v3, 0.0, 0.0 ))
+              if not zero_face_start:
+                  uvs.append(( u1, -1.0 * v1,
+                               u2, -1.0 * v2,
+                               u3, -1.0 * v3, 0.0, 0.0 ))
+              else:
+                  uvs.append((
+                               u2, -1.0 * v2,
+                               u3, -1.0 * v3, u1, -1.0 * v1, 0.0, 0.0 ))
+
+            else:
+                uvs.append((0.0, 0.0, 0.0, 0.0, 0.0 ,0.0 ,0.0, 0.0))
+
         for i in range(max_vertex + 1):
             vert = obj.getVertex(i, 0)
             verts.append((vert.x, vert.y, vert.z))
@@ -174,7 +188,7 @@ class SceneImporter():
         me.tessfaces.foreach_set("material_index", mat_index)
         if len(uvs) > 0:
             me.tessface_uv_textures.new()
-            for i in range(len(uvs)):
+            for i in range(len(faces)):
                 me.tessface_uv_textures[0].data[i].uv_raw = uvs[i]
 
         me.update(calc_edges=True)    # Update mesh with new data
