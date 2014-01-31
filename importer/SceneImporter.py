@@ -25,9 +25,7 @@ from bpy_extras.io_utils import unpack_list, unpack_face_list
 from ..maxwell import maxwell
 
 from .util import *
-
 from ..outputs import MaxwellLog
-
 
 
 def translate_material(mat, basepath):
@@ -208,6 +206,12 @@ class SceneImporter():
             bettername = re.match('(.*) \[\d{1,3}\.\d{1,3}\.\d{1,3}\]', name).group(1)
         except AttributeError as err:
             bettername = name
+        try: # strip of '[0]' and alike
+            bettername = re.match('(.*)\[\d{1,3}\]', bettername).group(1)
+        except AttributeError as err:
+            pass
+        while bettername[0] == " ":
+            bettername = bettername[1:]
         while name in self.name_mapping:
             name += '_'
         else: # we found a unique name, lets insert it
