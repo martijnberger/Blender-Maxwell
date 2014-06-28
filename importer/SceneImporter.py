@@ -42,9 +42,13 @@ def translate_material(mat, basepath):
         if layer.getNumBSDFs() > 0:
             bsdf = layer.getBSDF(0)
             refl = bsdf.getReflectance()
-            color = refl.getColor('color')
-            r, g, b = color.rgb.r, color.rgb.g, color.rgb.b
-            tex_path = color.pFileName
+            attr = refl.getAttribute('color')
+            print(attr)
+            tex_path = False
+            if len(attr) == 3:
+                r,g,b, = attr[0], attr[1],attr[2]
+            else:
+                tex_path = attr
             if tex_path:
                 tex = str(tex_path,'UTF-8').replace("\\","/")
                 MaxwellLog("LOADING: {}".format(tex))
